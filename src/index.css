@@ -1,0 +1,95 @@
+:root[data-theme='dark'] {
+  /* Instagram Evolution Palette (Dark) */
+  --bg-gradient-center: #121212;
+  --bg-gradient-edge: #000000;
+  --glass-bg: rgba(26, 26, 26, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --text-heading: #F8FAFC;
+  --text-body: #94A3B8;
+  --accent-lavender: #A78BFA;
+  --accent-cyan: #22D3EE;
+  --insta-gradient: linear-gradient(45deg, #FCAF45, #E1306C, #833AB4);
+  --card-bg: #1A1A1A;
+  --nav-bg: rgba(0, 0, 0, 0.85);
+}
+
+:root[data-theme='light'] {
+  /* Pastel Evolution Palette (Light) */
+  --bg-gradient-center: #F8F7FF;
+  --bg-gradient-edge: #E3E0F3;
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text-heading: #1F2937;
+  --text-body: #4B5563;
+  --accent-lavender: #8B5CF6;
+  --accent-cyan: #06B6D4;
+  --insta-gradient: linear-gradient(45deg, #FF9966, #FF5E62);
+  --card-bg: #FFFFFF;
+  --nav-bg: rgba(248, 247, 255, 0.85);
+}
+
+/* Base Root for initial load (defaults to dark) */
+:root {
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --border-radius: 12px;
+  --glass-blur: 20px;
+  --transition-speed: 0.5s;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--text-body);
+  background: radial-gradient(circle at center, var(--bg-gradient-center) 0%, var(--bg-gradient-edge) 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-heading);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  transition: color var(--transition-speed) ease;
+}
+
+a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+a:hover {
+  color: var(--accent-lavender);
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  transition: background-color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+}
+
+button {
+  font-family: var(--font-family);
+  border: none;
+  cursor: pointer;
+  outline: none;
+}
