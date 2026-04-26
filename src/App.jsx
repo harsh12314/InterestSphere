@@ -261,7 +261,8 @@ function App() {
         ...newPost,
         author: user?.displayName || 'Anonymous',
         authorId: user?.uid,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        likedBy: []
       });
     } catch (error) {
       console.error("Error creating post:", error);

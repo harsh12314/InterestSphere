@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
+import { db } from '../firebase';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
-const PostCard = ({ post, onViewProfile }) => {
-    const [liked, setLiked] = useState(false);
-    const [likesCount, setLikesCount] = useState(post.likes);
+const PostCard = ({ post, onViewProfile, currentUserData }) => {
+    const isLiked = currentUserData && post.likedBy?.includes(currentUserData.uid);
+    const likesCount = post.likedBy?.length || post.likes || 0;
     const [showComments, setShowComments] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [comments, setComments] = useState(post.commentsList || []);
 
-    const handleLike = () => {
-        setLiked(!liked);
-        setLikesCount(prev => liked ? prev - 1 : prev + 1);
+    const handleLike = async () => {
+        if (!currentUserData?.uid || !post.id) return;
+        const postRef = doc(db, 'posts', post.id);
+        try {
+            if (isLiked) {
+                await updateDoc(postRef, { likedBy: arrayRemove(currentUserData.uid) });
+            } else {
+                await updateDoc(postRef, { likedBy: arrayUnion(currentUserData.uid) });
+            }
+        } catch (error) {
+            console.error("Error updating like:", error);
+        }
     };
 
     const handleAddComment = () => {
@@ -81,9 +92,9 @@ const PostCard = ({ post, onViewProfile }) => {
                     <div className="flex items-center gap-6 mt-4">
                         <button 
                             onClick={handleLike}
-                            className={`flex items-center gap-2 transition-colors ${liked ? 'text-primary text-glow' : 'text-outline-variant hover:text-on-surface'}`}
+                            className={`flex items-center gap-2 transition-colors ${isLiked ? 'text-primary text-glow' : 'text-outline-variant hover:text-on-surface'}`}
                         >
-                            <span className="material-symbols-outlined" style={{ fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+                            <span className="material-symbols-outlined" style={{ fontVariationSettings: isLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
                             <span className="text-sm font-bold">{likesCount}</span>
                         </button>
                         <button 
@@ -158,7 +169,7 @@ const Feed = ({ posts, activatedSpheres, onViewProfile, currentUserData }) => {
     return (
         <div className="space-y-4 pb-20">
             {filteredPosts.map((post) => (
-                <PostCard key={post.id} post={post} onViewProfile={onViewProfile} />
+                <PostCard key={post.id} post={post} onViewProfile={onViewProfile} currentUserData={currentUserData} />
             ))}
         </div>
     );

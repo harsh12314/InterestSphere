@@ -7,7 +7,9 @@ import {
     addDoc,
     serverTimestamp,
     orderBy,
-    getDocs
+    getDocs,
+    doc,
+    setDoc
 } from 'firebase/firestore';
 
 const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
@@ -140,6 +142,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
 
         const convId = getConvId(user.uid, selectedUser.id);
         const messagesRef = collection(db, 'conversations', convId, 'messages');
+        const convRef = doc(db, 'conversations', convId);
 
         const messageData = {
             text: inputText,
@@ -153,6 +156,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
         setMedia([]);
 
         try {
+            await setDoc(convRef, { participants: [user.uid, selectedUser.id], lastUpdated: serverTimestamp() }, { merge: true });
             await addDoc(messagesRef, messageData);
         } catch (error) {
             console.error("Error sending message:", error);
