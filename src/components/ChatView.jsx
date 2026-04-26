@@ -1,0 +1,303 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { db } from '../firebase';
+import {
+    collection,
+    query,
+    onSnapshot,
+    addDoc,
+    serverTimestamp,
+    orderBy,
+    getDocs
+} from 'firebase/firestore';
+
+const ChatView = ({ user }) => {
+    const [users, setUsers] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [inputText, setInputText] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(true);
+    const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const [media, setMedia] = useState([]);
+
+    const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
+    const [showChatOnMobile, setShowChatOnMobile] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobileView(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    // Fetch User Directory
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const usersRef = collection(db, 'users');
+            const snapshot = await getDocs(usersRef);
+            const userList = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(u => u.id !== user?.uid); // Exclude self
+            setUsers(userList);
+            setLoading(false);
+        };
+        fetchUsers();
+    }, [user]);
+
+    // Conversation ID Logic (sorted UIDs)
+    const getConvId = (uid1, uid2) => {
+        return [uid1, uid2].sort().join('_');
+    };
+
+    // Real-time Message Listener
+    useEffect(() => {
+        if (!selectedUser || !user) return;
+
+        const convId = getConvId(user.uid, selectedUser.id);
+        const messagesRef = collection(db, 'conversations', convId, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const msgs = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMessages(msgs);
+        });
+
+        return () => unsubscribe();
+    }, [selectedUser, user]);
+
+    const handleSelectUser = (u) => {
+        setSelectedUser(u);
+        if (isMobileView) {
+            setShowChatOnMobile(true);
+        }
+    };
+
+    const handleBackToList = () => {
+        setShowChatOnMobile(false);
+    };
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        // In a real app, we would upload these to Firebase Storage and get URLs
+        const newMedia = files.map(file => ({
+            url: URL.createObjectURL(file),
+            type: file.type,
+            name: file.name
+        }));
+        setMedia([...media, ...newMedia]);
+    };
+
+    const handleSendMessage = async () => {
+        if ((!inputText.trim() && media.length === 0) || !selectedUser || !user) return;
+
+        const convId = getConvId(user.uid, selectedUser.id);
+        const messagesRef = collection(db, 'conversations', convId, 'messages');
+
+        const messageData = {
+            text: inputText,
+            senderId: user.uid,
+            senderName: user.displayName || user.email,
+            timestamp: serverTimestamp(),
+            media: media
+        };
+
+        setInputText('');
+        setMedia([]);
+
+        try {
+            await addDoc(messagesRef, messageData);
+        } catch (error) {
+            console.error("Error sending message:", error);
+        }
+    };
+
+    const filteredUsers = users.filter(u =>
+        u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if (loading) {
+        return (
+            <div className="flex h-[calc(100vh-8rem)] glass-panel rounded-3xl items-center justify-center">
+                <div className="text-primary font-headline font-bold animate-pulse text-lg">Initializing Connection...</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-[calc(100vh-8rem)] glass-panel rounded-[2rem] overflow-hidden shadow-2xl pb-16 md:pb-0">
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleFileChange}
+                multiple
+            />
+            {/* Sidebar: User List */}
+            <div className={`w-full md:w-80 border-r border-outline-variant/10 flex flex-col bg-surface-container/30 transition-transform ${isMobileView && showChatOnMobile ? 'hidden' : 'flex'}`}>
+                <div className="p-4 border-b border-outline-variant/10 bg-surface/50 backdrop-blur-md sticky top-0 z-10">
+                    <div className="flex items-center bg-surface-container rounded-xl px-4 py-2 border border-outline-variant/20 focus-within:border-primary transition-colors">
+                        <span className="material-symbols-outlined text-outline-variant mr-2 text-sm">search</span>
+                        <input
+                            type="text"
+                            className="w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-outline-variant outline-none text-on-surface"
+                            placeholder="Search Explorers..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2">
+                    {filteredUsers.length === 0 ? (
+                        <div className="p-6 text-center text-outline-variant/70 text-sm italic">
+                            No other explorers found in this sector.
+                        </div>
+                    ) : (
+                        filteredUsers.map((u, index) => (
+                            <div
+                                key={u.id}
+                                className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all mb-1 ${selectedUser?.id === u.id ? 'bg-primary/20 shadow-[0_0_15px_rgba(208,149,255,0.15)] border border-primary/30' : 'hover:bg-surface-container-high border border-transparent'}`}
+                                onClick={() => handleSelectUser(u)}
+                            >
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center text-on-surface font-bold text-lg shadow-inner flex-shrink-0" style={{ backgroundColor: `hsl(${index * 40}, 70%, 20%)`, border: `1px solid hsl(${index * 40}, 70%, 50%)` }}>
+                                    {u.displayName?.charAt(0) || u.email?.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-on-surface text-sm truncate">{u.displayName || 'Anonymous'}</div>
+                                    <div className="text-xs text-outline-variant truncate mt-0.5">
+                                        {u.bio ? u.bio.substring(0, 30) + '...' : u.email}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Main Chat Area */}
+            {selectedUser ? (
+                <div className={`flex-1 flex flex-col bg-surface/50 transition-transform ${isMobileView && !showChatOnMobile ? 'hidden' : 'flex'}`}>
+                    <div className="h-[72px] px-6 border-b border-outline-variant/10 bg-surface-container/50 backdrop-blur-md flex items-center gap-4 flex-shrink-0">
+                        {isMobileView && (
+                            <button className="text-on-surface-variant hover:text-on-surface transition-colors p-2 -ml-2" onClick={handleBackToList}>
+                                <span className="material-symbols-outlined">arrow_back</span>
+                            </button>
+                        )}
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface font-bold border border-primary/50 shadow-[0_0_10px_rgba(208,149,255,0.2)] bg-primary/20">
+                            {selectedUser.displayName?.charAt(0) || selectedUser.email?.charAt(0)}
+                        </div>
+                        <div>
+                            <div className="font-bold text-on-surface text-sm">{selectedUser.displayName || 'Explorer'}</div>
+                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-primary mt-0.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                                Direct Frequency Enabled
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+                        {messages.length === 0 && (
+                            <div className="flex-1 flex flex-col items-center justify-center opacity-30 gap-4 text-center">
+                                <span className="material-symbols-outlined text-[64px]">forum</span>
+                                <p className="text-sm font-headline">Start a secured conversation with {selectedUser.displayName || 'this explorer'}.</p>
+                            </div>
+                        )}
+                        {messages.map(msg => (
+                            <div key={msg.id} className={`flex flex-col max-w-[80%] ${msg.senderId === user.uid ? 'self-end items-end' : 'self-start items-start'}`}>
+                                {msg.media && msg.media.length > 0 && (
+                                    <div className="flex flex-col gap-2 mb-2">
+                                        {msg.media.map((m, i) => (
+                                            m.type?.startsWith('image/') ? (
+                                                <img key={i} src={m.url} alt="chat-media" className="max-w-[200px] rounded-xl border border-outline-variant/20 shadow-md" />
+                                            ) : (
+                                                <div key={i} className="flex items-center gap-2 bg-surface-variant/50 px-3 py-2 rounded-lg border border-outline-variant/10 text-xs">
+                                                    <span className="material-symbols-outlined text-sm">description</span> {m.name}
+                                                </div>
+                                            )
+                                        ))}
+                                    </div>
+                                )}
+                                <div className={`px-4 py-3 text-sm rounded-2xl shadow-sm ${msg.senderId === user.uid ? 'bg-gradient-to-br from-primary to-primary-fixed text-on-primary rounded-tr-sm' : 'bg-surface-variant text-on-surface-variant rounded-tl-sm border border-outline-variant/10'}`}>
+                                    {msg.text}
+                                </div>
+                                <div className="text-[10px] text-outline-variant/50 mt-1 font-bold">
+                                    {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Sending...'}
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="p-4 border-t border-outline-variant/10 bg-surface-container/30">
+                        <div className="flex flex-col gap-2">
+                            {media.length > 0 && (
+                                <div className="flex gap-2 overflow-x-auto pb-2 px-1">
+                                    {media.map((m, idx) => (
+                                        <div key={idx} className="relative group">
+                                            {m.type?.startsWith('image/') ? (
+                                                <img src={m.url} className="h-12 w-12 object-cover rounded-lg border border-outline-variant/30" />
+                                            ) : (
+                                                <div className="h-12 w-12 flex items-center justify-center bg-surface-variant rounded-lg border border-outline-variant/30">
+                                                    <span className="material-symbols-outlined text-sm">description</span>
+                                                </div>
+                                            )}
+                                            <button
+                                                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-error text-on-error rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                                onClick={() => setMedia(media.filter((_, i) => i !== idx))}
+                                            >
+                                                <span className="material-symbols-outlined text-[10px]">close</span>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex items-center gap-3">
+                                <button className="w-10 h-10 rounded-full flex items-center justify-center text-outline-variant hover:text-primary hover:bg-primary/10 transition-colors" title="Send Media" onClick={() => fileInputRef.current.click()}>
+                                    <span className="material-symbols-outlined text-[20px]">attach_file</span>
+                                </button>
+                                <div className="flex-1 flex items-center bg-surface rounded-full px-4 py-2 border border-outline-variant/20 focus-within:border-primary transition-colors">
+                                    <input
+                                        type="text"
+                                        className="w-full bg-transparent border-none focus:ring-0 text-sm outline-none text-on-surface placeholder:text-outline-variant"
+                                        placeholder={`Message ${selectedUser.displayName || 'Explorer'}...`}
+                                        value={inputText}
+                                        onChange={(e) => setInputText(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    />
+                                </div>
+                                <button
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${(!inputText.trim() && media.length === 0) ? 'bg-surface-variant text-outline-variant/50 cursor-not-allowed' : 'bg-primary text-on-primary shadow-[0_0_15px_rgba(208,149,255,0.4)] hover:scale-105 active:scale-95'}`}
+                                    onClick={handleSendMessage}
+                                    disabled={!inputText.trim() && media.length === 0}
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">send</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className={`flex-1 flex flex-col items-center justify-center gap-6 opacity-50 transition-transform ${isMobileView ? 'hidden' : 'flex'}`}>
+                    <span className="material-symbols-outlined text-[80px] text-primary animate-pulse">satellite_alt</span>
+                    <div className="text-center">
+                        <h3 className="text-xl font-headline font-bold text-on-surface">Select an explorer to open a direct frequency</h3>
+                        <p className="text-sm text-outline-variant mt-2">All transmissions are secured via InterestSphere protocols.</p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ChatView;

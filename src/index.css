@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body bg-background text-on-surface antialiased overflow-hidden h-screen;
+  }
+  
+  /* Make standard scrollbars look good on dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-variant rounded-full;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-[#272339]/40 backdrop-blur-2xl border border-[#4a4557]/20 shadow-xl;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 15px rgba(208, 149, 255, 0.4);
+  }
+
+  .sphere-badge {
+    box-shadow: 0 0 10px rgba(208, 149, 255, 0.2);
+  }
+}
