@@ -48,56 +48,64 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
         }
     }, [directChatUser, isMobileView]);
 
-    // Fetch contacts: only followed users + users with chat history (Real-time)
+    // Fetch contacts: only followed users + users with chat history (Real-time for both users and conversations)
     useEffect(() => {
+        let unsubUsers = () => {};
         let unsubConvs = () => {};
 
-        const initChatList = async () => {
+        const initChatList = () => {
             if (!user) return;
             
-            // Fetch all other users once per mount or dependencies change
-            const usersRef = collection(db, 'users');
-            const snapshot = await getDocs(usersRef);
-            const allUsers = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(u => u.id !== user?.uid);
-
             const followingList = currentUserData?.following || [];
 
-            // Listen to conversations for new chats
-            const convsRef = collection(db, 'conversations');
-            unsubConvs = onSnapshot(convsRef, (convsSnap) => {
-                const chatPartnerIds = new Set();
-                convsSnap.docs.forEach(d => {
-                    const parts = d.id.split('_');
-                    if (parts.includes(user.uid)) {
-                        parts.forEach(p => { if (p !== user.uid) chatPartnerIds.add(p); });
-                    }
-                });
+            let currentAllUsers = [];
+            let currentChatPartnerIds = new Set();
 
-                // Only show: followed users OR users with chat history
-                const filtered = allUsers.filter(u => {
+            const updateList = () => {
+                const filtered = currentAllUsers.filter(u => {
                     const isFollowed = followingList.includes(u.id);
-                    const hasChatted = chatPartnerIds.has(u.id);
+                    const hasChatted = currentChatPartnerIds.has(u.id);
                     return isFollowed || hasChatted;
                 });
 
-                // If directChatUser exists but isn't in the list, add them
                 if (directChatUser && !filtered.find(u => u.id === directChatUser.id)) {
                     filtered.unshift(directChatUser);
                 }
 
                 setUsers(filtered);
                 setLoading(false);
-            }, (err) => {
-                console.error("Chat list listener error:", err);
-                setLoading(false);
-            });
+            };
+
+            // Real-time listener for ALL users (so brand new registrations appear)
+            const usersRef = collection(db, 'users');
+            unsubUsers = onSnapshot(usersRef, (snapshot) => {
+                currentAllUsers = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(u => u.id !== user?.uid);
+                updateList();
+            }, (err) => console.error("Users listener error:", err));
+
+            // Real-time listener for conversations
+            const convsRef = collection(db, 'conversations');
+            unsubConvs = onSnapshot(convsRef, (convsSnap) => {
+                const newPartnerIds = new Set();
+                convsSnap.docs.forEach(d => {
+                    const parts = d.id.split('_');
+                    if (parts.includes(user.uid)) {
+                        parts.forEach(p => { if (p !== user.uid) newPartnerIds.add(p); });
+                    }
+                });
+                currentChatPartnerIds = newPartnerIds;
+                updateList();
+            }, (err) => console.error("Conversations listener error:", err));
         };
 
         initChatList();
 
-        return () => unsubConvs();
+        return () => {
+            unsubUsers();
+            unsubConvs();
+        };
     }, [user, currentUserData, directChatUser]);
 
     // Conversation ID Logic (sorted UIDs)
