@@ -227,11 +227,19 @@ function App() {
         const q = userSearchQuery.toLowerCase();
         const results = snapshot.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(u =>
-            u.id !== user?.uid &&
-            (u.username?.toLowerCase().includes(q) ||
-             u.displayName?.toLowerCase().includes(q))
-          )
+          .filter(u => {
+            const matchesSearch = u.id !== user?.uid &&
+              (u.username?.toLowerCase().includes(q) ||
+               u.displayName?.toLowerCase().includes(q));
+            
+            if (!matchesSearch) return false;
+
+            // Domain intersection check: Must share at least one sphere name
+            const myDomains = (currentUserData?.spheres || []).map(s => s.name.trim().toLowerCase());
+            const theirDomains = (u.spheres || []).map(s => s.name.trim().toLowerCase());
+            
+            return myDomains.some(domain => theirDomains.includes(domain));
+          })
           .slice(0, 8);
         setUserSearchResults(results);
       } catch (err) {
