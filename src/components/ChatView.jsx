@@ -48,10 +48,14 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
         }
     }, [directChatUser, isMobileView]);
 
-    // Fetch contacts: only followed users + users with chat history
+    // Fetch contacts: only followed users + users with chat history (Real-time)
     useEffect(() => {
-        const fetchUsers = async () => {
+        let unsubConvs = () => {};
+
+        const initChatList = async () => {
             if (!user) return;
+            
+            // Fetch all other users once per mount or dependencies change
             const usersRef = collection(db, 'users');
             const snapshot = await getDocs(usersRef);
             const allUsers = snapshot.docs
@@ -60,35 +64,40 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
 
             const followingList = currentUserData?.following || [];
 
-            // Check chat history
-            const chatPartnerIds = new Set();
-            try {
-                const convsRef = collection(db, 'conversations');
-                const convsSnap = await getDocs(convsRef);
+            // Listen to conversations for new chats
+            const convsRef = collection(db, 'conversations');
+            unsubConvs = onSnapshot(convsRef, (convsSnap) => {
+                const chatPartnerIds = new Set();
                 convsSnap.docs.forEach(d => {
                     const parts = d.id.split('_');
                     if (parts.includes(user.uid)) {
                         parts.forEach(p => { if (p !== user.uid) chatPartnerIds.add(p); });
                     }
                 });
-            } catch (e) { /* conversations collection may not exist yet */ }
 
-            // Only show: followed users OR users with chat history
-            const filtered = allUsers.filter(u => {
-                const isFollowed = followingList.includes(u.id);
-                const hasChatted = chatPartnerIds.has(u.id);
-                return isFollowed || hasChatted;
+                // Only show: followed users OR users with chat history
+                const filtered = allUsers.filter(u => {
+                    const isFollowed = followingList.includes(u.id);
+                    const hasChatted = chatPartnerIds.has(u.id);
+                    return isFollowed || hasChatted;
+                });
+
+                // If directChatUser exists but isn't in the list, add them
+                if (directChatUser && !filtered.find(u => u.id === directChatUser.id)) {
+                    filtered.unshift(directChatUser);
+                }
+
+                setUsers(filtered);
+                setLoading(false);
+            }, (err) => {
+                console.error("Chat list listener error:", err);
+                setLoading(false);
             });
-
-            // If directChatUser exists but isn't in the list, add them
-            if (directChatUser && !filtered.find(u => u.id === directChatUser.id)) {
-                filtered.unshift(directChatUser);
-            }
-
-            setUsers(filtered);
-            setLoading(false);
         };
-        fetchUsers();
+
+        initChatList();
+
+        return () => unsubConvs();
     }, [user, currentUserData, directChatUser]);
 
     // Conversation ID Logic (sorted UIDs)
