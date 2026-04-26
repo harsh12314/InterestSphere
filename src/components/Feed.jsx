@@ -206,9 +206,12 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                                     <p className="text-sm text-outline-variant italic">No transmissions yet. Be the first.</p>
                                 ) : (
                                     commentsList.map(c => {
-                                        const isOwnComment = currentUserData && c.authorId === currentUserData.uid;
+                                        const isOwnComment = currentUserData && (
+                                            c.authorId === currentUserData.uid || 
+                                            (!c.authorId && c.author === (currentUserData.displayName || currentUserData.email))
+                                        );
                                         return (
-                                        <div key={c.id} className="flex gap-3 group/comment">
+                                        <div key={c.id} className="flex gap-3 group/comment py-2">
                                             <div className="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-xs font-bold text-on-surface shrink-0">
                                                 {c.author.charAt(0)}
                                             </div>
@@ -230,9 +233,10 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                                                     <div className="mt-1">
                                                         <input 
                                                             type="text" 
-                                                            className="w-full bg-surface-container rounded p-1.5 border border-outline-variant/30 text-sm text-on-surface focus:border-primary outline-none"
+                                                            className="w-full bg-surface-container rounded-xl p-2 border border-outline-variant/30 text-sm text-on-surface focus:border-primary outline-none"
                                                             value={editCommentText}
                                                             onChange={(e) => setEditCommentText(e.target.value)}
+                                                            onKeyPress={(e) => e.key === 'Enter' && handleSaveCommentEdit(c.id)}
                                                             autoFocus
                                                         />
                                                         <div className="flex justify-end gap-2 mt-1">
