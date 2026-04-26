@@ -144,7 +144,7 @@ const PostCard = ({ post, onViewProfile }) => {
 
 const Feed = ({ posts, activatedSpheres, onViewProfile, currentUserData }) => {
     const filteredPosts = posts.filter(p =>
-        activatedSpheres.some(sphere => sphere.name === p.domain)
+        activatedSpheres.some(sphere => sphere.name.trim().toLowerCase() === p.domain?.trim().toLowerCase())
     );
 
     if (filteredPosts.length === 0) {

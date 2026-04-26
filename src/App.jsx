@@ -137,14 +137,14 @@ function App() {
     );
 
     const followingList = currentUserData?.following || [];
-    const activeDomains = activatedSpheres.map(s => s.name);
+    const activeDomains = activatedSpheres.map(s => s.name.trim().toLowerCase());
 
     // Sort: followed users first, then matching domain, then others
     return filtered.sort((a, b) => {
       const aFollowed = followingList.includes(a.authorId) ? 2 : 0;
       const bFollowed = followingList.includes(b.authorId) ? 2 : 0;
-      const aDomain = activeDomains.includes(a.domain) ? 1 : 0;
-      const bDomain = activeDomains.includes(b.domain) ? 1 : 0;
+      const aDomain = activeDomains.includes(a.domain?.trim().toLowerCase()) ? 1 : 0;
+      const bDomain = activeDomains.includes(b.domain?.trim().toLowerCase()) ? 1 : 0;
       return (bFollowed + bDomain) - (aFollowed + aDomain);
     });
   })();
