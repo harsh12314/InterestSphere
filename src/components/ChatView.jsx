@@ -62,15 +62,11 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
             let currentChatPartnerIds = new Set();
 
             const updateList = () => {
+                const followingList = currentUserData?.following || [];
                 const filtered = currentAllUsers.filter(u => {
+                    const isFollowed = followingList.includes(u.id);
                     const hasChatted = currentChatPartnerIds.has(u.id);
-                    
-                    // Domain intersection check
-                    const myDomains = (currentUserData?.spheres || []).map(s => s.name.trim().toLowerCase());
-                    const theirDomains = (u.spheres || []).map(s => s.name.trim().toLowerCase());
-                    const sharesDomain = myDomains.some(domain => theirDomains.includes(domain));
-
-                    return sharesDomain || hasChatted;
+                    return isFollowed || hasChatted;
                 });
 
                 if (directChatUser && !filtered.find(u => u.id === directChatUser.id)) {
