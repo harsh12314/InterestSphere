@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { db, auth, storage } from '../firebase';
 import { doc, updateDoc, getDoc, arrayUnion, arrayRemove, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, signOut } from 'firebase/auth';
 
 const PREDEFINED_SPHERES = [
     { name: 'AI', color: '#A78BFA' },
@@ -142,6 +142,14 @@ const UserProfile = ({ user, currentUserData, subscribedSpheres, activatedSphere
             console.error("Error uploading profile picture:", error);
             alert("Failed to upload image. Please try again.");
         } finally { setUploadingPhoto(false); }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+        } catch (err) {
+            console.error("Logout error:", err);
+        }
     };
 
     // --- VIEWING OTHER USER'S PROFILE ---
@@ -287,6 +295,13 @@ const UserProfile = ({ user, currentUserData, subscribedSpheres, activatedSphere
                                 <h2 className="text-3xl font-headline font-extrabold text-on-surface mb-1">{user?.displayName || 'Obsidian Scholar'}</h2>
                                 <div className="text-sm text-outline-variant font-bold">@{ownData.username || 'user'} · {user?.email}</div>
                             </div>
+                            <button
+                                onClick={handleLogout}
+                                className="px-6 py-2 rounded-full font-bold text-sm bg-surface-container border border-outline-variant/30 text-error hover:bg-error-container hover:text-on-error-container hover:border-error/50 transition-all flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">logout</span>
+                                Logout
+                            </button>
                         </div>
                         {/* Follower/Following counts */}
                         <div className="flex gap-6 mb-4">
