@@ -12,7 +12,7 @@ import {
     doc
 } from 'firebase/firestore';
 
-const ChatSection = ({ user, fullView }) => {
+const ChatSection = ({ user, fullView, currentUserData }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -47,6 +47,7 @@ const ChatSection = ({ user, fullView }) => {
                 text: input,
                 senderId: user.uid,
                 senderName: user.displayName || user.email,
+                senderSpheres: currentUserData?.spheres || [],
                 timestamp: serverTimestamp()
             };
 
@@ -69,6 +70,20 @@ const ChatSection = ({ user, fullView }) => {
         }
     };
 
+    const filteredMessages = messages.filter(msg => {
+        // Always show own messages
+        if (msg.senderId === user?.uid) return true;
+        
+        // If message has no spheres (legacy), hide it to be strict or show it?
+        // Let's hide it to follow the user's "only those" request
+        if (!msg.senderSpheres || msg.senderSpheres.length === 0) return false;
+
+        const myDomains = (currentUserData?.spheres || []).map(s => s.name.trim().toLowerCase());
+        const theirDomains = msg.senderSpheres.map(s => s.name.trim().toLowerCase());
+        
+        return myDomains.some(d => theirDomains.includes(d));
+    });
+
     if (fullView) {
         return (
             <div className="flex flex-col h-[calc(100vh-12rem)] glass-panel rounded-3xl overflow-hidden mt-4">
@@ -78,12 +93,12 @@ const ChatSection = ({ user, fullView }) => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
-                    {messages.length === 0 && (
+                    {filteredMessages.length === 0 && (
                         <div className="text-center py-12 text-outline-variant italic font-headline">
                             No signals in the global interlink...
                         </div>
                     )}
-                    {messages.map(msg => (
+                    {filteredMessages.map(msg => (
                         <div key={msg.id} className={`flex flex-col max-w-[80%] group ${msg.senderId === user?.uid ? 'self-end items-end' : 'self-start items-start'}`}>
                             {msg.senderId !== user?.uid && (
                                 <span className="text-xs font-bold text-primary mb-1 ml-1">{msg.senderName}</span>
@@ -145,12 +160,12 @@ const ChatSection = ({ user, fullView }) => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-                        {messages.length === 0 && (
+                        {filteredMessages.length === 0 && (
                             <div className="text-center py-8 text-xs text-outline-variant italic">
                                 No signals in the global interlink...
                             </div>
                         )}
-                        {messages.map(msg => (
+                        {filteredMessages.map(msg => (
                             <div key={msg.id} className={`flex flex-col max-w-[85%] group ${msg.senderId === user?.uid ? 'self-end items-end' : 'self-start items-start'}`}>
                                 {msg.senderId !== user?.uid && (
                                     <span className="text-[10px] font-bold text-primary mb-0.5 ml-1">{msg.senderName}</span>

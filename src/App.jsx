@@ -447,7 +447,7 @@ function App() {
           )}
 
           {currentView === 'global' && (
-            <ChatSection user={user} fullView={true} />
+            <ChatSection user={user} fullView={true} currentUserData={currentUserData} />
           )}
 
           {currentView === 'feed' && (
@@ -512,6 +512,10 @@ function App() {
       <div className="md:hidden">
         <BottomNav currentView={currentView} setView={setCurrentView} />
       </div>
+
+      {user && currentView !== 'global' && (
+        <ChatSection user={user} currentUserData={currentUserData} />
+      )}
     </div>
   );
 }
