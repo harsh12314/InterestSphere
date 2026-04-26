@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 const PostCard = ({ post, onViewProfile, currentUserData }) => {
     const isLiked = currentUserData && post.likedBy?.includes(currentUserData.uid);
     const likesCount = post.likedBy?.length || post.likes || 0;
+    const isOwnPost = currentUserData && post.authorId === currentUserData.uid;
+    
     const [showComments, setShowComments] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [comments, setComments] = useState(post.commentsList || []);
+    
+    const [isEditing, setIsEditing] = useState(false);
+    const [editBody, setEditBody] = useState(post.body);
 
     const handleLike = async () => {
         if (!currentUserData?.uid || !post.id) return;
@@ -20,6 +25,25 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
             }
         } catch (error) {
             console.error("Error updating like:", error);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (window.confirm("Are you sure you want to delete this transmission?")) {
+            try {
+                await deleteDoc(doc(db, 'posts', post.id));
+            } catch (error) {
+                console.error("Error deleting post:", error);
+            }
+        }
+    };
+
+    const handleSaveEdit = async () => {
+        try {
+            await updateDoc(doc(db, 'posts', post.id), { body: editBody });
+            setIsEditing(false);
+        } catch (error) {
+            console.error("Error updating post:", error);
         }
     };
 
@@ -54,14 +78,41 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                             <span className="font-bold text-lg text-on-surface hover:text-primary cursor-pointer transition-colors" onClick={() => post.authorId && onViewProfile?.(post.authorId)}>{post.author}</span>
                             <span className="text-xs text-outline-variant font-medium uppercase">{post.time}</span>
                         </div>
-                        <div className="px-4 py-1.5 rounded-full text-[10px] font-black tracking-[0.2em] bg-secondary-container/30 text-secondary border border-secondary/20 uppercase sphere-badge">
-                            #{post.domain.toUpperCase()}
+                        <div className="flex items-center gap-3">
+                            {isOwnPost && (
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setIsEditing(!isEditing)} className="text-outline-variant hover:text-primary transition-colors">
+                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button onClick={handleDelete} className="text-outline-variant hover:text-error transition-colors">
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                    </button>
+                                </div>
+                            )}
+                            <div className="px-4 py-1.5 rounded-full text-[10px] font-black tracking-[0.2em] bg-secondary-container/30 text-secondary border border-secondary/20 uppercase sphere-badge">
+                                #{post.domain.toUpperCase()}
+                            </div>
                         </div>
                     </div>
                     
-                    <p className="text-on-surface-variant text-lg leading-relaxed mb-6">
-                        {post.body}
-                    </p>
+                    {isEditing ? (
+                        <div className="mb-6">
+                            <textarea
+                                className="w-full bg-surface-container rounded-xl p-3 border border-outline-variant/30 text-on-surface focus:border-primary outline-none resize-none"
+                                rows="3"
+                                value={editBody}
+                                onChange={(e) => setEditBody(e.target.value)}
+                            />
+                            <div className="flex justify-end gap-3 mt-2">
+                                <button onClick={() => { setIsEditing(false); setEditBody(post.body); }} className="text-sm font-bold text-outline-variant hover:text-on-surface transition-colors">Cancel</button>
+                                <button onClick={handleSaveEdit} className="text-sm font-bold text-primary hover:text-primary-fixed-dim transition-colors">Save</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-on-surface-variant text-lg leading-relaxed mb-6 whitespace-pre-wrap">
+                            {post.body}
+                        </p>
+                    )}
 
                     {post.media && post.media.length > 0 && (
                         <div className="mb-6">
