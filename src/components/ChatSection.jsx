@@ -7,7 +7,9 @@ import {
     addDoc,
     serverTimestamp,
     orderBy,
-    limit
+    limit,
+    deleteDoc,
+    doc
 } from 'firebase/firestore';
 
 const ChatSection = ({ user, fullView }) => {
@@ -57,6 +59,16 @@ const ChatSection = ({ user, fullView }) => {
         }
     };
 
+    const handleDelete = async (id) => {
+        if (window.confirm("Are you sure you want to retract this signal?")) {
+            try {
+                await deleteDoc(doc(db, 'global_chat', id));
+            } catch (error) {
+                console.error("Error deleting global message:", error);
+            }
+        }
+    };
+
     if (fullView) {
         return (
             <div className="flex flex-col h-[calc(100vh-12rem)] glass-panel rounded-3xl overflow-hidden mt-4">
@@ -72,12 +84,22 @@ const ChatSection = ({ user, fullView }) => {
                         </div>
                     )}
                     {messages.map(msg => (
-                        <div key={msg.id} className={`flex flex-col max-w-[80%] ${msg.senderId === user?.uid ? 'self-end items-end' : 'self-start items-start'}`}>
+                        <div key={msg.id} className={`flex flex-col max-w-[80%] group ${msg.senderId === user?.uid ? 'self-end items-end' : 'self-start items-start'}`}>
                             {msg.senderId !== user?.uid && (
                                 <span className="text-xs font-bold text-primary mb-1 ml-1">{msg.senderName}</span>
                             )}
-                            <div className={`px-4 py-3 rounded-2xl ${msg.senderId === user?.uid ? 'bg-primary text-on-primary rounded-tr-sm' : 'bg-surface-variant text-on-surface-variant rounded-tl-sm'}`}>
-                                {msg.text}
+                            <div className="flex items-center gap-2 group/msg">
+                                {msg.senderId === user?.uid && (
+                                    <button 
+                                        onClick={() => handleDelete(msg.id)}
+                                        className="opacity-0 group-hover/msg:opacity-100 text-outline-variant hover:text-error transition-all order-first"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                    </button>
+                                )}
+                                <div className={`px-4 py-3 rounded-2xl ${msg.senderId === user?.uid ? 'bg-primary text-on-primary rounded-tr-sm' : 'bg-surface-variant text-on-surface-variant rounded-tl-sm'}`}>
+                                    {msg.text}
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -129,12 +151,22 @@ const ChatSection = ({ user, fullView }) => {
                             </div>
                         )}
                         {messages.map(msg => (
-                            <div key={msg.id} className={`flex flex-col max-w-[85%] ${msg.senderId === user?.uid ? 'self-end items-end' : 'self-start items-start'}`}>
+                            <div key={msg.id} className={`flex flex-col max-w-[85%] group ${msg.senderId === user?.uid ? 'self-end items-end' : 'self-start items-start'}`}>
                                 {msg.senderId !== user?.uid && (
                                     <span className="text-[10px] font-bold text-primary mb-0.5 ml-1">{msg.senderName}</span>
                                 )}
-                                <div className={`px-3 py-2 text-sm rounded-xl ${msg.senderId === user?.uid ? 'bg-primary text-on-primary rounded-tr-sm' : 'bg-surface-variant text-on-surface-variant rounded-tl-sm'}`}>
-                                    {msg.text}
+                                <div className="flex items-center gap-1.5 group/msg">
+                                    {msg.senderId === user?.uid && (
+                                        <button 
+                                            onClick={() => handleDelete(msg.id)}
+                                            className="opacity-0 group-hover/msg:opacity-100 text-outline-variant hover:text-error transition-all order-first"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                                        </button>
+                                    )}
+                                    <div className={`px-3 py-2 text-sm rounded-xl ${msg.senderId === user?.uid ? 'bg-primary text-on-primary rounded-tr-sm' : 'bg-surface-variant text-on-surface-variant rounded-tl-sm'}`}>
+                                        {msg.text}
+                                    </div>
                                 </div>
                             </div>
                         ))}
