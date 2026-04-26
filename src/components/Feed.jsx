@@ -6,10 +6,10 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
     const isLiked = currentUserData && post.likedBy?.includes(currentUserData.uid);
     const likesCount = post.likedBy?.length || post.likes || 0;
     const isOwnPost = currentUserData && post.authorId === currentUserData.uid;
+    const commentsList = post.commentsList || [];
     
     const [showComments, setShowComments] = useState(false);
     const [commentText, setCommentText] = useState('');
-    const [comments, setComments] = useState(post.commentsList || []);
     
     const [isEditing, setIsEditing] = useState(false);
     const [editBody, setEditBody] = useState(post.body);
@@ -47,15 +47,23 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
         }
     };
 
-    const handleAddComment = () => {
-        if (commentText.trim()) {
+    const handleAddComment = async () => {
+        if (commentText.trim() && currentUserData?.uid) {
             const newComment = {
                 id: Date.now(),
-                author: 'You',
+                author: currentUserData.displayName || currentUserData.email || 'Explorer',
                 text: commentText
             };
-            setComments([...comments, newComment]);
-            setCommentText('');
+            
+            setCommentText(''); // Optimistically clear input
+            
+            try {
+                await updateDoc(doc(db, 'posts', post.id), {
+                    commentsList: arrayUnion(newComment)
+                });
+            } catch (error) {
+                console.error("Error adding comment:", error);
+            }
         }
     };
 
@@ -153,7 +161,7 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                             className={`flex items-center gap-2 transition-colors ${showComments ? 'text-secondary text-glow' : 'text-outline-variant hover:text-on-surface'}`}
                         >
                             <span className="material-symbols-outlined">chat_bubble</span>
-                            <span className="text-sm font-bold">{comments.length}</span>
+                            <span className="text-sm font-bold">{commentsList.length}</span>
                         </button>
                         <button className="flex items-center gap-2 text-outline-variant hover:text-on-surface transition-colors">
                             <span className="material-symbols-outlined">share</span>
@@ -164,10 +172,10 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                     {showComments && (
                         <div className="mt-6 glass-panel rounded-2xl p-4 animate-in">
                             <div className="space-y-4 mb-4 max-h-60 overflow-y-auto pr-2">
-                                {comments.length === 0 ? (
+                                {commentsList.length === 0 ? (
                                     <p className="text-sm text-outline-variant italic">No transmissions yet. Be the first.</p>
                                 ) : (
-                                    comments.map(c => (
+                                    commentsList.map(c => (
                                         <div key={c.id} className="flex gap-3">
                                             <div className="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-xs font-bold text-on-surface">
                                                 {c.author.charAt(0)}
