@@ -12,7 +12,7 @@ const PREDEFINED_SPHERES = [
     { name: 'Space', color: '#FBBF24' }
 ];
 
-const UserProfile = ({ user, currentUserData, subscribedSpheres, activatedSpheres, onToggleActivation, onCreateSphere, onUpdateSpheres, bio, onUpdateBio, viewingUserId, onViewProfile, onBack }) => {
+const UserProfile = ({ user, currentUserData, subscribedSpheres, activatedSpheres, onToggleActivation, onCreateSphere, onUpdateSpheres, bio, onUpdateBio, viewingUserId, onViewProfile, onBack, onMessage }) => {
     const isOwnProfile = !viewingUserId || viewingUserId === user?.uid;
     
     const [profileData, setProfileData] = useState(null);
@@ -174,16 +174,27 @@ const UserProfile = ({ user, currentUserData, subscribedSpheres, activatedSphere
                                     <h2 className="text-3xl font-headline font-extrabold text-on-surface mb-1">{displayData.displayName || 'Explorer'}</h2>
                                     <div className="text-sm text-outline-variant font-bold">@{displayData.username || 'unknown'}</div>
                                 </div>
-                                <button
-                                    onClick={isFollowing ? handleUnfollow : handleFollow}
-                                    disabled={followLoading}
-                                    className={`px-8 py-3 rounded-full font-bold text-sm transition-all shadow-lg ${isFollowing
-                                        ? 'bg-surface-container border border-outline-variant/30 text-on-surface hover:bg-error-container hover:text-on-error-container hover:border-error/50'
-                                        : 'bg-gradient-to-br from-pink-500 to-primary text-white hover:scale-105 shadow-primary/30'
-                                    } disabled:opacity-50`}
-                                >
-                                    {followLoading ? '...' : isFollowing ? 'Unfollow' : 'Follow'}
-                                </button>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={isFollowing ? handleUnfollow : handleFollow}
+                                        disabled={followLoading}
+                                        className={`px-6 py-3 rounded-full font-bold text-sm transition-all shadow-lg ${isFollowing
+                                            ? 'bg-surface-container border border-outline-variant/30 text-on-surface hover:bg-error-container hover:text-on-error-container hover:border-error/50'
+                                            : 'bg-gradient-to-br from-pink-500 to-primary text-white hover:scale-105 shadow-primary/30'
+                                        } disabled:opacity-50`}
+                                    >
+                                        {followLoading ? '...' : isFollowing ? 'Unfollow' : 'Follow'}
+                                    </button>
+                                    {onMessage && (
+                                        <button
+                                            onClick={() => onMessage({ id: viewingUserId, ...displayData })}
+                                            className="px-6 py-3 rounded-full font-bold text-sm bg-surface-container border border-outline-variant/30 text-on-surface hover:border-primary/50 hover:bg-primary/10 transition-all flex items-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">chat_bubble</span>
+                                            Message
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex gap-6 mb-4">
                                 <div className="text-center cursor-pointer" onClick={() => setActiveTab('followers')}>

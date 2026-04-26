@@ -10,7 +10,7 @@ import {
     getDocs
 } from 'firebase/firestore';
 
-const ChatView = ({ user, spheres, currentUserData }) => {
+const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -38,7 +38,15 @@ const ChatView = ({ user, spheres, currentUserData }) => {
         scrollToBottom();
     }, [messages]);
 
-    // Fetch User Directory - filtered by domain/following/chat history
+    // If directChatUser is provided, auto-select them
+    useEffect(() => {
+        if (directChatUser) {
+            setSelectedUser(directChatUser);
+            if (isMobileView) setShowChatOnMobile(true);
+        }
+    }, [directChatUser, isMobileView]);
+
+    // Fetch contacts: only followed users + users with chat history
     useEffect(() => {
         const fetchUsers = async () => {
             if (!user) return;
@@ -49,7 +57,6 @@ const ChatView = ({ user, spheres, currentUserData }) => {
                 .filter(u => u.id !== user?.uid);
 
             const followingList = currentUserData?.following || [];
-            const myDomains = (spheres || []).map(s => s.name);
 
             // Check chat history
             const chatPartnerIds = new Set();
@@ -64,23 +71,23 @@ const ChatView = ({ user, spheres, currentUserData }) => {
                 });
             } catch (e) { /* conversations collection may not exist yet */ }
 
+            // Only show: followed users OR users with chat history
             const filtered = allUsers.filter(u => {
-                // 1. Same domain
-                const userDomains = (u.spheres || []).map(s => s.name);
-                const sharedDomain = myDomains.some(d => userDomains.includes(d));
-                // 2. Following
                 const isFollowed = followingList.includes(u.id);
-                // 3. Chat history
                 const hasChatted = chatPartnerIds.has(u.id);
-
-                return sharedDomain || isFollowed || hasChatted;
+                return isFollowed || hasChatted;
             });
+
+            // If directChatUser exists but isn't in the list, add them
+            if (directChatUser && !filtered.find(u => u.id === directChatUser.id)) {
+                filtered.unshift(directChatUser);
+            }
 
             setUsers(filtered);
             setLoading(false);
         };
         fetchUsers();
-    }, [user, currentUserData, spheres]);
+    }, [user, currentUserData, directChatUser]);
 
     // Conversation ID Logic (sorted UIDs)
     const getConvId = (uid1, uid2) => {

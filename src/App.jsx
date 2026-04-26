@@ -109,6 +109,9 @@ function App() {
   const [userSearchResults, setUserSearchResults] = useState([]);
   const [showUserSearch, setShowUserSearch] = useState(false);
 
+  // Direct message state
+  const [directChatUser, setDirectChatUser] = useState(null);
+
   // Theme Logic
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('is-theme') || 'dark';
@@ -224,6 +227,11 @@ function App() {
     setShowUserSearch(false);
     setUserSearchQuery('');
     setUserSearchResults([]);
+  };
+
+  const handleDirectMessage = (targetUser) => {
+    setDirectChatUser(targetUser);
+    setCurrentView('chat');
   };
 
   const handlePostCreated = (newPost) => {
@@ -365,7 +373,7 @@ function App() {
 
       <div className="flex h-screen pt-20">
         {/* Left Navigation Sidebar */}
-        <Navigation currentView={currentView} setView={(v) => { setCurrentView(v); if (v === 'profile') setViewingUserId(null); }} user={user} />
+        <Navigation currentView={currentView} setView={(v) => { setCurrentView(v); if (v === 'profile') setViewingUserId(null); if (v !== 'chat') setDirectChatUser(null); }} user={user} />
 
         {/* Central Content Area */}
         <main className="flex-1 md:ml-64 lg:mr-80 overflow-y-auto px-4 md:px-12 py-8 bg-surface">
@@ -391,11 +399,12 @@ function App() {
               viewingUserId={viewingUserId}
               onViewProfile={handleViewProfile}
               onBack={() => setCurrentView('feed')}
+              onMessage={handleDirectMessage}
             />
           )}
 
           {currentView === 'chat' && (
-            <ChatView user={user} spheres={subscribedSpheres} currentUserData={currentUserData} />
+            <ChatView user={user} spheres={subscribedSpheres} currentUserData={currentUserData} directChatUser={directChatUser} />
           )}
 
           {currentView === 'global' && (
