@@ -10,7 +10,7 @@ import {
     getDocs
 } from 'firebase/firestore';
 
-const ChatView = ({ user }) => {
+const ChatView = ({ user, spheres, currentUserData }) => {
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -38,19 +38,49 @@ const ChatView = ({ user }) => {
         scrollToBottom();
     }, [messages]);
 
-    // Fetch User Directory
+    // Fetch User Directory - filtered by domain/following/chat history
     useEffect(() => {
         const fetchUsers = async () => {
+            if (!user) return;
             const usersRef = collection(db, 'users');
             const snapshot = await getDocs(usersRef);
-            const userList = snapshot.docs
+            const allUsers = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(u => u.id !== user?.uid); // Exclude self
-            setUsers(userList);
+                .filter(u => u.id !== user?.uid);
+
+            const followingList = currentUserData?.following || [];
+            const myDomains = (spheres || []).map(s => s.name);
+
+            // Check chat history
+            const chatPartnerIds = new Set();
+            try {
+                const convsRef = collection(db, 'conversations');
+                const convsSnap = await getDocs(convsRef);
+                convsSnap.docs.forEach(d => {
+                    const parts = d.id.split('_');
+                    if (parts.includes(user.uid)) {
+                        parts.forEach(p => { if (p !== user.uid) chatPartnerIds.add(p); });
+                    }
+                });
+            } catch (e) { /* conversations collection may not exist yet */ }
+
+            const filtered = allUsers.filter(u => {
+                // 1. Same domain
+                const userDomains = (u.spheres || []).map(s => s.name);
+                const sharedDomain = myDomains.some(d => userDomains.includes(d));
+                // 2. Following
+                const isFollowed = followingList.includes(u.id);
+                // 3. Chat history
+                const hasChatted = chatPartnerIds.has(u.id);
+
+                return sharedDomain || isFollowed || hasChatted;
+            });
+
+            setUsers(filtered);
             setLoading(false);
         };
         fetchUsers();
-    }, [user]);
+    }, [user, currentUserData, spheres]);
 
     // Conversation ID Logic (sorted UIDs)
     const getConvId = (uid1, uid2) => {

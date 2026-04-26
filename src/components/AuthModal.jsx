@@ -6,7 +6,7 @@ import {
     signInWithPopup,
     updateProfile
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import logo from '../assets/logo.jpg';
 
 const PREDEFINED_SPHERES = [
@@ -23,6 +23,7 @@ const AuthModal = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
     const [selectedSpheres, setSelectedSpheres] = useState([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -62,6 +63,26 @@ const AuthModal = () => {
         setLoading(true);
         setError('');
         try {
+            // Validate username uniqueness
+            const usernameClean = username.trim().toLowerCase();
+            if (!usernameClean || usernameClean.length < 3) {
+                setError('Username must be at least 3 characters.');
+                setLoading(false);
+                return;
+            }
+            if (!/^[a-z0-9_]+$/.test(usernameClean)) {
+                setError('Username can only contain lowercase letters, numbers, and underscores.');
+                setLoading(false);
+                return;
+            }
+            const usernameQuery = query(collection(db, 'users'), where('username', '==', usernameClean));
+            const usernameSnap = await getDocs(usernameQuery);
+            if (!usernameSnap.empty) {
+                setError('This username is already taken. Choose another.');
+                setLoading(false);
+                return;
+            }
+
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
@@ -69,9 +90,13 @@ const AuthModal = () => {
 
             await setDoc(doc(db, 'users', user.uid), {
                 displayName: name,
+                username: usernameClean,
                 email: email,
                 spheres: selectedSpheres,
-                bio: 'New explorer in the InterestSphere'
+                bio: 'New explorer in the InterestSphere',
+                followers: [],
+                following: [],
+                createdAt: new Date().toISOString()
             });
 
         } catch (err) {
@@ -91,11 +116,16 @@ const AuthModal = () => {
 
             const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (!userDoc.exists()) {
+                const autoUsername = (user.displayName || user.email.split('@')[0]).toLowerCase().replace(/[^a-z0-9_]/g, '_').substring(0, 20) + '_' + Date.now().toString(36);
                 await setDoc(doc(db, 'users', user.uid), {
                     displayName: user.displayName,
+                    username: autoUsername,
                     email: user.email,
                     spheres: PREDEFINED_SPHERES.slice(0, 3),
-                    bio: 'New explorer in the InterestSphere'
+                    bio: 'New explorer in the InterestSphere',
+                    followers: [],
+                    following: [],
+                    createdAt: new Date().toISOString()
                 });
             }
         } catch (err) {
@@ -203,6 +233,7 @@ const AuthModal = () => {
 
                             <form onSubmit={handleInitialAuth} className="space-y-5">
                                 {!isLogin && (
+                                    <>
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-widest text-outline-variant mb-2">Full Name</label>
                                         <input
@@ -214,6 +245,22 @@ const AuthModal = () => {
                                             required
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-widest text-outline-variant mb-2">Username</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant text-sm">@</span>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-surface-container rounded-xl pl-8 pr-4 py-3 text-on-surface border border-outline-variant/20 focus:border-pink-400 focus:ring-1 focus:ring-pink-400 outline-none transition-all"
+                                                placeholder="nova_scribe"
+                                                value={username}
+                                                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                                                required
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-outline-variant mt-1">Lowercase letters, numbers, underscores only</p>
+                                    </div>
+                                    </>
                                 )}
                                 <div>
                                     <label className="block text-xs font-bold uppercase tracking-widest text-outline-variant mb-2">Email Access</label>

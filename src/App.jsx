@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import Navigation from './components/Navigation';
 import AuthModal from './components/AuthModal';
 import Feed from './components/Feed';
@@ -23,6 +23,7 @@ const initialPosts = [
   {
     id: 1,
     author: 'Alex',
+    authorId: 'mock_alex',
     domain: 'AI',
     body: 'The new reasoning models are incredible!',
     time: '2h ago',
@@ -38,6 +39,7 @@ const initialPosts = [
   {
     id: 2,
     author: 'Sam',
+    authorId: 'mock_sam',
     domain: 'Web Dev',
     body: 'Just updated my React prototype to use Vite and Framer Motion.',
     time: '4h ago',
@@ -49,6 +51,7 @@ const initialPosts = [
   {
     id: 3,
     author: 'Jordan',
+    authorId: 'mock_jordan',
     domain: 'Finance',
     body: 'Analyzing Q1 reports. Check the attached summary.',
     time: '5h ago',
@@ -63,8 +66,9 @@ const initialPosts = [
   {
     id: 4,
     author: 'Luna',
+    authorId: 'mock_luna',
     domain: 'Gaming',
-    body: 'Just finished the secret quest in Elder’s Reach. The world design is breathtaking!',
+    body: 'Just finished the secret quest in Elder\u2019s Reach. The world design is breathtaking!',
     time: '6h ago',
     likes: 42,
     commentsList: [
@@ -75,15 +79,13 @@ const initialPosts = [
   {
     id: 5,
     author: 'Nova',
+    authorId: 'mock_nova',
     domain: 'Space',
-    body: 'Received fresh telemetric data from the station. The nebula resonance is higher than expected. ✨',
+    body: 'Received fresh telemetric data from the station. The nebula resonance is higher than expected. \u2728',
     time: '12h ago',
     likes: 156,
     commentsList: [
       { id: 1, author: 'Astro', text: 'Stunning data. Is the station stable?' }
-    ],
-    media: [
-      { url: 'file:///C:/Users/thvs1/.gemini/antigravity/brain/3220076b-d68e-41e0-823d-fb97dec8ba10/space_nebula_demo_1772566967303.png', type: 'image/png', name: 'nebula-echo.png' }
     ]
   },
 ];
@@ -91,12 +93,21 @@ const initialPosts = [
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('feed'); // 'feed', 'profile', 'chat'
+  const [currentView, setCurrentView] = useState('feed'); // 'feed', 'profile', 'chat', 'viewProfile'
   const [userBio, setUserBio] = useState('New explorer in the InterestSphere');
   const [subscribedSpheres, setSubscribedSpheres] = useState(defaultSpheres);
   const [activatedSpheres, setActivatedSpheres] = useState(defaultSpheres);
   const [posts, setPosts] = useState(initialPosts);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Follow system state
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [viewingUserId, setViewingUserId] = useState(null);
+
+  // User Search state
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState([]);
+  const [showUserSearch, setShowUserSearch] = useState(false);
 
   // Theme Logic
   const [theme, setTheme] = useState(() => {
@@ -113,15 +124,29 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  const filteredPostsForFeed = posts.filter(post => {
-    const query = searchQuery.toLowerCase();
-    return (
-      post.author.toLowerCase().includes(query) ||
-      post.domain.toLowerCase().includes(query) ||
-      post.body.toLowerCase().includes(query)
+  // Feed filtering: prioritize posts from followed users + active domains
+  const filteredPostsForFeed = (() => {
+    const queryStr = searchQuery.toLowerCase();
+    const filtered = posts.filter(post =>
+      post.author.toLowerCase().includes(queryStr) ||
+      post.domain.toLowerCase().includes(queryStr) ||
+      post.body.toLowerCase().includes(queryStr)
     );
-  });
 
+    const followingList = currentUserData?.following || [];
+    const activeDomains = activatedSpheres.map(s => s.name);
+
+    // Sort: followed users first, then matching domain, then others
+    return filtered.sort((a, b) => {
+      const aFollowed = followingList.includes(a.authorId) ? 2 : 0;
+      const bFollowed = followingList.includes(b.authorId) ? 2 : 0;
+      const aDomain = activeDomains.includes(a.domain) ? 1 : 0;
+      const bDomain = activeDomains.includes(b.domain) ? 1 : 0;
+      return (bFollowed + bDomain) - (aFollowed + aDomain);
+    });
+  })();
+
+  // Auth state + Firestore user data listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       try {
@@ -133,14 +158,18 @@ function App() {
             setSubscribedSpheres(userData.spheres || defaultSpheres);
             setActivatedSpheres(userData.spheres || defaultSpheres);
             setUserBio(userData.bio || 'AI Researcher & Finance Enthusiast');
+            setCurrentUserData({ uid: currentUser.uid, ...userData });
+          } else {
+            setCurrentUserData({ uid: currentUser.uid, following: [], followers: [] });
           }
           setUser(currentUser);
         } else {
           setUser(null);
+          setCurrentUserData(null);
         }
       } catch (error) {
         console.error("Initialization error:", error);
-        setUser(currentUser); // Still set user if auth worked but firestore failed
+        setUser(currentUser);
       } finally {
         setLoading(false);
       }
@@ -148,8 +177,57 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // Real-time listener for currentUserData (following/followers updates)
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setCurrentUserData(prev => ({ ...prev, ...data, uid: user.uid }));
+      }
+    });
+    return () => unsub();
+  }, [user]);
+
+  // User search with debounce
+  useEffect(() => {
+    if (!userSearchQuery.trim() || userSearchQuery.trim().length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const usersRef = collection(db, 'users');
+        const snapshot = await getDocs(usersRef);
+        const q = userSearchQuery.toLowerCase();
+        const results = snapshot.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(u =>
+            u.id !== user?.uid &&
+            (u.username?.toLowerCase().includes(q) ||
+             u.displayName?.toLowerCase().includes(q))
+          )
+          .slice(0, 8);
+        setUserSearchResults(results);
+      } catch (err) {
+        console.error("User search error:", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [userSearchQuery, user]);
+
+  const handleViewProfile = (userId) => {
+    setViewingUserId(userId);
+    setCurrentView('viewProfile');
+    setShowUserSearch(false);
+    setUserSearchQuery('');
+    setUserSearchResults([]);
+  };
+
   const handlePostCreated = (newPost) => {
-    setPosts([{ ...newPost, id: Date.now(), author: user?.displayName || 'Anonymous' }, ...posts]);
+    setPosts([{ ...newPost, id: Date.now(), author: user?.displayName || 'Anonymous', authorId: user?.uid }, ...posts]);
   };
 
   const handleToggleActivation = (sphere) => {
@@ -207,20 +285,79 @@ function App() {
           InterestSphere
         </div>
         <div className="flex items-center gap-6">
-          <div className="relative flex items-center bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant/20 focus-within:border-primary transition-all hidden md:flex">
-            <span className="material-symbols-outlined text-outline-variant mr-2">search</span>
-            <input 
-              className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-outline-variant outline-none" 
-              placeholder="Explore the cosmos..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          {/* User Search */}
+          <div className="relative hidden md:block">
+            <div className="relative flex items-center bg-surface-container-low rounded-full px-4 py-2 border border-outline-variant/20 focus-within:border-primary transition-all">
+              <span className="material-symbols-outlined text-outline-variant mr-2">search</span>
+              <input 
+                className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-outline-variant outline-none" 
+                placeholder="Search users or posts..." 
+                value={showUserSearch ? userSearchQuery : searchQuery}
+                onChange={(e) => {
+                  if (showUserSearch) {
+                    setUserSearchQuery(e.target.value);
+                  } else {
+                    setSearchQuery(e.target.value);
+                  }
+                }}
+                onFocus={() => setShowUserSearch(true)}
+                onBlur={() => setTimeout(() => setShowUserSearch(false), 200)}
+              />
+              {showUserSearch && (
+                <button 
+                  className="text-xs text-pink-400 font-bold ml-2 hover:text-pink-300 transition-colors"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setShowUserSearch(false);
+                    setUserSearchQuery('');
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            
+            {/* Search Results Dropdown */}
+            {showUserSearch && userSearchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-surface-container border border-outline-variant/20 rounded-2xl shadow-2xl overflow-hidden z-[100] backdrop-blur-xl">
+                {userSearchResults.map((u, i) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 p-3 hover:bg-primary/10 cursor-pointer transition-colors border-b border-outline-variant/10 last:border-0"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleViewProfile(u.id);
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface font-bold text-sm shadow-inner flex-shrink-0" style={{ backgroundColor: `hsl(${i * 60}, 70%, 20%)`, border: `1px solid hsl(${i * 60}, 70%, 50%)` }}>
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt="" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        u.displayName?.charAt(0) || u.email?.charAt(0)
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm text-on-surface truncate">{u.displayName || 'Anonymous'}</div>
+                      <div className="text-xs text-outline-variant truncate">@{u.username || 'user'}</div>
+                    </div>
+                    <span className="material-symbols-outlined text-outline-variant text-sm">arrow_forward</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showUserSearch && userSearchQuery.length >= 2 && userSearchResults.length === 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-surface-container border border-outline-variant/20 rounded-2xl shadow-2xl p-4 text-center text-outline-variant text-sm z-[100]">
+                No users found matching &quot;{userSearchQuery}&quot;
+              </div>
+            )}
           </div>
+
           <div className="flex items-center gap-4 text-slate-400">
             <span className="material-symbols-outlined hover:text-[#d095ff] cursor-pointer transition-colors">notifications</span>
             <span className="material-symbols-outlined hover:text-[#d095ff] cursor-pointer transition-colors" onClick={toggleTheme}>settings</span>
             {user && (
-              <img alt="User profile" className="w-10 h-10 rounded-full border-2 border-primary/30 object-cover" src={user.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuDUoostPb_wO5NUdhLmsRiUn_-YSsdiVCTNC8A71_c9910Im2F1ksKPWZDTFcmZtrR_Bcd0yNQ9vWex1Ifg0QBDEZbRLr8ubKyiuMVAbvv29ocF2ETJ4zmadXGVQWsbdFzpReLssYLFtvordEaEgXb2yQR_keWRKwt64APhODsc2MKByuttwRbMNpaKtMUphhb638itPjKPCdMhOsn2_b2GwzF9qQnBDumzEZtverTuefNmLXQCx5sStVBVZF-yQnz7ab-689jqW9Y"}/>
+              <img alt="User profile" className="w-10 h-10 rounded-full border-2 border-primary/30 object-cover cursor-pointer" src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || 'U'}&background=272339&color=d095ff`} onClick={() => { setCurrentView('profile'); setViewingUserId(null); }} />
             )}
           </div>
         </div>
@@ -228,13 +365,14 @@ function App() {
 
       <div className="flex h-screen pt-20">
         {/* Left Navigation Sidebar */}
-        <Navigation currentView={currentView} setView={setCurrentView} user={user} />
+        <Navigation currentView={currentView} setView={(v) => { setCurrentView(v); if (v === 'profile') setViewingUserId(null); }} user={user} />
 
         {/* Central Content Area */}
         <main className="flex-1 md:ml-64 lg:mr-80 overflow-y-auto px-4 md:px-12 py-8 bg-surface">
           {currentView === 'profile' && (
             <UserProfile
               user={user}
+              currentUserData={currentUserData}
               subscribedSpheres={subscribedSpheres}
               activatedSpheres={activatedSpheres}
               onToggleActivation={handleToggleActivation}
@@ -242,11 +380,22 @@ function App() {
               onUpdateSpheres={setSubscribedSpheres}
               bio={userBio}
               onUpdateBio={setUserBio}
+              onViewProfile={handleViewProfile}
+            />
+          )}
+
+          {currentView === 'viewProfile' && viewingUserId && (
+            <UserProfile
+              user={user}
+              currentUserData={currentUserData}
+              viewingUserId={viewingUserId}
+              onViewProfile={handleViewProfile}
+              onBack={() => setCurrentView('feed')}
             />
           )}
 
           {currentView === 'chat' && (
-            <ChatView user={user} spheres={subscribedSpheres} />
+            <ChatView user={user} spheres={subscribedSpheres} currentUserData={currentUserData} />
           )}
 
           {currentView === 'global' && (
@@ -267,6 +416,8 @@ function App() {
               <Feed
                 posts={filteredPostsForFeed}
                 activatedSpheres={activatedSpheres}
+                onViewProfile={handleViewProfile}
+                currentUserData={currentUserData}
               />
             </>
           )}
@@ -296,23 +447,15 @@ function App() {
 
           <section>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="font-headline font-extrabold text-sm uppercase tracking-widest text-primary">Active Pilots</h3>
-              <span className="text-[10px] bg-secondary-container/20 text-secondary px-2 py-0.5 rounded-full font-bold">42 ONLINE</span>
+              <h3 className="font-headline font-extrabold text-sm uppercase tracking-widest text-primary">Following</h3>
+              <span className="text-[10px] bg-secondary-container/20 text-secondary px-2 py-0.5 rounded-full font-bold">{currentUserData?.following?.length || 0}</span>
             </div>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img alt="User" className="w-10 h-10 rounded-full object-cover border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACTeMGwzphBbgrYKTnzLR_bohdWojnDTeunAdkAiqkV0WHJ37VGnzC4AQQYs8RYVZEPO7-kDlyq2xWl2pOo7K7Q9kvuMOhyCLlmWpYsVutu20btH_WyCX_AWYjf19OXY-i4CIjDZzbTBb-QsAfNFUmFtLAeWGYzWtAVj6Yh1xAcyIfqyrcwBQIe_BYifPa0Zj0ugDjUFY5hWZH7AiLhiGoVhlGVBodJjaD_RyoTa4Y-_PBu6IT2BkVw5Z05Ovj5E8cH-Doa8NbdEE"/>
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background"></div>
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-on-surface group-hover:text-primary transition-colors">Nova_Scribe</div>
-                    <div className="text-[10px] text-outline-variant">Designing Nebula</div>
-                  </div>
-                </div>
-                <span className="material-symbols-outlined text-outline-variant text-sm">more_horiz</span>
-              </div>
+            <div className="space-y-3">
+              {(!currentUserData?.following || currentUserData.following.length === 0) ? (
+                <p className="text-outline-variant text-xs italic">You&apos;re not following anyone yet. Search and follow users to see them here.</p>
+              ) : (
+                <p className="text-outline-variant text-xs">Your followed users appear in feed priority.</p>
+              )}
             </div>
           </section>
         </aside>

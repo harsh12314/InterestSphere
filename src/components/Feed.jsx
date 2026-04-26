@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const PostCard = ({ post }) => {
+const PostCard = ({ post, onViewProfile }) => {
     const [liked, setLiked] = useState(false);
     const [likesCount, setLikesCount] = useState(post.likes);
     const [showComments, setShowComments] = useState(false);
@@ -40,7 +40,7 @@ const PostCard = ({ post }) => {
                 <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                            <span className="font-bold text-lg text-on-surface">{post.author}</span>
+                            <span className="font-bold text-lg text-on-surface hover:text-primary cursor-pointer transition-colors" onClick={() => post.authorId && onViewProfile?.(post.authorId)}>{post.author}</span>
                             <span className="text-xs text-outline-variant font-medium uppercase">{post.time}</span>
                         </div>
                         <div className="px-4 py-1.5 rounded-full text-[10px] font-black tracking-[0.2em] bg-secondary-container/30 text-secondary border border-secondary/20 uppercase sphere-badge">
@@ -142,7 +142,7 @@ const PostCard = ({ post }) => {
     );
 };
 
-const Feed = ({ posts, activatedSpheres }) => {
+const Feed = ({ posts, activatedSpheres, onViewProfile, currentUserData }) => {
     const filteredPosts = posts.filter(p =>
         activatedSpheres.some(sphere => sphere.name === p.domain)
     );
@@ -158,7 +158,7 @@ const Feed = ({ posts, activatedSpheres }) => {
     return (
         <div className="space-y-4 pb-20">
             {filteredPosts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard key={post.id} post={post} onViewProfile={onViewProfile} />
             ))}
         </div>
     );
