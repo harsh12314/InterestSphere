@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import Navigation from './components/Navigation';
 import AuthModal from './components/AuthModal';
 import Feed from './components/Feed';
@@ -97,7 +97,7 @@ function App() {
   const [userBio, setUserBio] = useState('New explorer in the InterestSphere');
   const [subscribedSpheres, setSubscribedSpheres] = useState(defaultSpheres);
   const [activatedSpheres, setActivatedSpheres] = useState(defaultSpheres);
-  const [posts, setPosts] = useState(initialPosts);
+  const [posts, setPosts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Follow system state
@@ -148,6 +148,27 @@ function App() {
       return (bFollowed + bDomain) - (aFollowed + aDomain);
     });
   })();
+
+  // Real-time listener for posts
+  useEffect(() => {
+    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetchedPosts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let timeString = 'Just now';
+        if (data.createdAt) {
+          const diffMs = Date.now() - data.createdAt.toMillis();
+          const diffMins = Math.floor(diffMs / 60000);
+          if (diffMins < 60) timeString = `${diffMins || 1}m ago`;
+          else if (diffMins < 1440) timeString = `${Math.floor(diffMins / 60)}h ago`;
+          else timeString = new Date(data.createdAt.toMillis()).toLocaleDateString();
+        }
+        return { id: doc.id, ...data, time: timeString };
+      });
+      setPosts(fetchedPosts);
+    });
+    return () => unsub();
+  }, []);
 
   // Auth state + Firestore user data listener
   useEffect(() => {
@@ -234,8 +255,17 @@ function App() {
     setCurrentView('chat');
   };
 
-  const handlePostCreated = (newPost) => {
-    setPosts([{ ...newPost, id: Date.now(), author: user?.displayName || 'Anonymous', authorId: user?.uid }, ...posts]);
+  const handlePostCreated = async (newPost) => {
+    try {
+      await addDoc(collection(db, 'posts'), {
+        ...newPost,
+        author: user?.displayName || 'Anonymous',
+        authorId: user?.uid,
+        createdAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error creating post:", error);
+    }
   };
 
   const handleToggleActivation = (sphere) => {
