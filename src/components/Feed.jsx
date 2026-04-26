@@ -13,6 +13,9 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
     
     const [isEditing, setIsEditing] = useState(false);
     const [editBody, setEditBody] = useState(post.body);
+    
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editCommentText, setEditCommentText] = useState('');
 
     const handleLike = async () => {
         if (!currentUserData?.uid || !post.id) return;
@@ -52,6 +55,7 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
             const newComment = {
                 id: Date.now(),
                 author: currentUserData.displayName || currentUserData.email || 'Explorer',
+                authorId: currentUserData.uid,
                 text: commentText
             };
             
@@ -64,6 +68,32 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
             } catch (error) {
                 console.error("Error adding comment:", error);
             }
+        }
+    };
+
+    const handleDeleteComment = async (comment) => {
+        if (window.confirm("Are you sure you want to delete this reply?")) {
+            try {
+                await updateDoc(doc(db, 'posts', post.id), {
+                    commentsList: arrayRemove(comment)
+                });
+            } catch (error) {
+                console.error("Error deleting comment:", error);
+            }
+        }
+    };
+
+    const handleSaveCommentEdit = async (commentId) => {
+        try {
+            const updatedComments = commentsList.map(c => 
+                c.id === commentId ? { ...c, text: editCommentText } : c
+            );
+            await updateDoc(doc(db, 'posts', post.id), {
+                commentsList: updatedComments
+            });
+            setEditingCommentId(null);
+        } catch (error) {
+            console.error("Error updating comment:", error);
         }
     };
 
@@ -175,17 +205,47 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                                 {commentsList.length === 0 ? (
                                     <p className="text-sm text-outline-variant italic">No transmissions yet. Be the first.</p>
                                 ) : (
-                                    commentsList.map(c => (
-                                        <div key={c.id} className="flex gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-xs font-bold text-on-surface">
+                                    commentsList.map(c => {
+                                        const isOwnComment = currentUserData && c.authorId === currentUserData.uid;
+                                        return (
+                                        <div key={c.id} className="flex gap-3 group/comment">
+                                            <div className="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-xs font-bold text-on-surface shrink-0">
                                                 {c.author.charAt(0)}
                                             </div>
-                                            <div>
-                                                <div className="font-bold text-sm text-on-surface">{c.author}</div>
-                                                <div className="text-sm text-on-surface-variant">{c.text}</div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="font-bold text-sm text-on-surface">{c.author}</div>
+                                                    {isOwnComment && (
+                                                        <div className="flex items-center gap-2 opacity-0 group-hover/comment:opacity-100 transition-opacity">
+                                                            <button onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.text); }} className="text-outline-variant hover:text-primary transition-colors">
+                                                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                                                            </button>
+                                                            <button onClick={() => handleDeleteComment(c)} className="text-outline-variant hover:text-error transition-colors">
+                                                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {editingCommentId === c.id ? (
+                                                    <div className="mt-1">
+                                                        <input 
+                                                            type="text" 
+                                                            className="w-full bg-surface-container rounded p-1.5 border border-outline-variant/30 text-sm text-on-surface focus:border-primary outline-none"
+                                                            value={editCommentText}
+                                                            onChange={(e) => setEditCommentText(e.target.value)}
+                                                            autoFocus
+                                                        />
+                                                        <div className="flex justify-end gap-2 mt-1">
+                                                            <button onClick={() => setEditingCommentId(null)} className="text-[10px] font-bold text-outline-variant hover:text-on-surface transition-colors">CANCEL</button>
+                                                            <button onClick={() => handleSaveCommentEdit(c.id)} className="text-[10px] font-bold text-primary hover:text-primary-fixed-dim transition-colors">SAVE</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm text-on-surface-variant break-words">{c.text}</div>
+                                                )}
                                             </div>
                                         </div>
-                                    ))
+                                    )})
                                 )}
                             </div>
                             <div className="flex items-center gap-2 border-t border-outline-variant/10 pt-4">
