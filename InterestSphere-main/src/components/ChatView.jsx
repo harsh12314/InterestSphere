@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, storage } from '../firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db } from '../firebase';
 import {
     collection,
     query,
@@ -24,7 +23,6 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     const fileInputRef = useRef(null);
     const [media, setMedia] = useState([]);
     const [isSending, setIsSending] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
 
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
     const [showChatOnMobile, setShowChatOnMobile] = useState(false);
@@ -161,38 +159,17 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     const handleSendMessage = async () => {
         if ((!inputText.trim() && media.length === 0) || !selectedUser || !user || isSending) return;
         setIsSending(true);
-        setUploadProgress(0);
 
         const convId = getConvId(user.uid, selectedUser.id);
         const messagesRef = collection(db, 'conversations', convId, 'messages');
         const convRef = doc(db, 'conversations', convId);
 
         try {
-            const uploadedMedia = await Promise.all(media.map(async (m) => {
-                if (m.file) {
-                    const safeName = m.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-                    const storageRef = ref(storage, `chats/${Date.now()}_${safeName}`);
-                    
-                    return new Promise((resolve, reject) => {
-                        const metadata = { contentType: m.file.type };
-                        const uploadTask = uploadBytesResumable(storageRef, m.file, metadata);
-                        uploadTask.on('state_changed', 
-                            (snapshot) => {
-                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                                setUploadProgress(progress);
-                            }, 
-                            (error) => {
-                                console.error("Chat upload error:", m.name, error);
-                                reject(error);
-                            }, 
-                            async () => {
-                                const url = await getDownloadURL(uploadTask.snapshot.ref);
-                                resolve({ url, name: m.name, type: m.type });
-                            }
-                        );
-                    });
-                }
-                return m;
+            // Use local URLs for instant demo playback
+            const localMedia = media.map(m => ({
+                url: m.url || URL.createObjectURL(m.file),
+                name: m.name,
+                type: m.type
             }));
 
             const messageData = {
@@ -200,7 +177,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
                 senderId: user.uid,
                 senderName: user.displayName || user.email,
                 timestamp: serverTimestamp(),
-                media: uploadedMedia
+                media: localMedia
             };
 
             setInputText('');
@@ -210,16 +187,9 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
             await addDoc(messagesRef, messageData);
         } catch (error) {
             console.error("Error sending message:", error);
-            let msg = "Send failed. ";
-            if (error.code === 'storage/unauthorized') {
-                msg += "Update your Firebase Storage Rules to allow uploads.";
-            } else {
-                msg += error.message || "Check your connection.";
-            }
-            alert(msg);
+            alert("Failed to send message locally.");
         } finally {
             setIsSending(false);
-            setUploadProgress(0);
         }
     };
 
@@ -400,11 +370,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
                                     onClick={handleSendMessage}
                                     disabled={(!inputText.trim() && media.length === 0) || isSending}
                                 >
-                                    {isSending ? (
-                                        <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <span className="material-symbols-outlined text-[18px]">send</span>
-                                    )}
+                                    <span className="material-symbols-outlined text-[18px]">send</span>
                                 </button>
                             </div>
                         </div>

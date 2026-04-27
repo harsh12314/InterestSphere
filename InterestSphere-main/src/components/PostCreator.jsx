@@ -1,6 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { storage } from '../firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const PostCreator = ({ availableDomains, onPost }) => {
     const [content, setContent] = useState('');
@@ -24,71 +22,29 @@ const PostCreator = ({ availableDomains, onPost }) => {
         setMedia(media.filter(m => m.id !== id));
     };
 
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-
-    const handlePost = async () => {
+    const handlePost = () => {
         if (!selectedDomain || content.trim().length === 0) return;
-        setIsUploading(true);
-        setUploadProgress(0);
 
-        try {
-            const uploadedMedia = await Promise.all(media.map(async (m) => {
-                if (m.file) {
-                    // Sanitize filename: remove spaces and special chars
-                    const safeName = m.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-                    const storageRef = ref(storage, `posts/${Date.now()}_${safeName}`);
-                    
-                    return new Promise((resolve, reject) => {
-                        const metadata = { contentType: m.file.type };
-                        const uploadTask = uploadBytesResumable(storageRef, m.file, metadata);
-                        uploadTask.on('state_changed', 
-                            (snapshot) => {
-                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                                setUploadProgress(progress);
-                            }, 
-                            (error) => {
-                                console.error("Upload error for file:", m.name, error);
-                                reject(error);
-                            }, 
-                            async () => {
-                                const url = await getDownloadURL(uploadTask.snapshot.ref);
-                                resolve({ url, name: m.name, type: m.type });
-                            }
-                        );
-                    });
-                }
-                return { url: m.url || '#', name: m.name, type: m.type };
-            }));
+        // Use local URLs for instant demo playback
+        const localMedia = media.map(m => ({
+            url: m.preview || URL.createObjectURL(m.file),
+            name: m.name,
+            type: m.type
+        }));
 
-            onPost({
-                author: 'You',
-                domain: selectedDomain,
-                body: content,
-                time: 'Just now',
-                likes: 0,
-                commentsList: [],
-                media: uploadedMedia
-            });
+        onPost({
+            author: 'You',
+            domain: selectedDomain,
+            body: content,
+            time: 'Just now',
+            likes: 0,
+            commentsList: [],
+            media: localMedia
+        });
 
-            setContent('');
-            setSelectedDomain('');
-            setMedia([]);
-        } catch (error) {
-            console.error("Critical Upload error:", error);
-            let msg = "Upload failed. ";
-            if (error.code === 'storage/unauthorized') {
-                msg += "Please update your Firebase Storage Rules (see my instructions).";
-            } else if (error.code === 'storage/retry-limit-exceeded') {
-                msg += "Connection timed out. Check your internet.";
-            } else {
-                msg += error.message || "Unknown error.";
-            }
-            alert(msg);
-        } finally {
-            setIsUploading(false);
-            setUploadProgress(0);
-        }
+        setContent('');
+        setSelectedDomain('');
+        setMedia([]);
     };
 
     return (
@@ -161,18 +117,11 @@ const PostCreator = ({ availableDomains, onPost }) => {
                             </select>
                         </div>
                         <button 
-                            className={`px-8 py-2 rounded-full font-bold text-sm transition-all flex items-center gap-2 relative overflow-hidden ${(!selectedDomain || content.trim().length === 0 || isUploading) ? 'bg-surface-variant text-outline-variant cursor-not-allowed' : 'bg-primary text-on-primary hover:shadow-[0_0_15px_rgba(208,149,255,0.4)]'}`}
-                            disabled={!selectedDomain || content.trim().length === 0 || isUploading}
+                            className={`px-8 py-2 rounded-full font-bold text-sm transition-all flex items-center gap-2 relative overflow-hidden ${(!selectedDomain || content.trim().length === 0) ? 'bg-surface-variant text-outline-variant cursor-not-allowed' : 'bg-primary text-on-primary hover:shadow-[0_0_15px_rgba(208,149,255,0.4)]'}`}
+                            disabled={!selectedDomain || content.trim().length === 0}
                             onClick={handlePost}
                         >
-                            {isUploading && (
-                                <div 
-                                    className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300" 
-                                    style={{ width: `${uploadProgress}%` }}
-                                ></div>
-                            )}
-                            {isUploading && <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>}
-                            {isUploading ? `Transmitting (${Math.round(uploadProgress)}%)...` : 'Launch'}
+                            Launch
                         </button>
                     </div>
                 </div>
