@@ -161,6 +161,21 @@ const PostCard = ({ post, onViewProfile, currentUserData }) => {
                                             <img src={m.url} alt={m.name} className="w-full h-auto object-cover group-hover/img:scale-105 transition-transform duration-700" />
                                             <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent"></div>
                                         </div>
+                                    ) : m.type?.startsWith('video/') ? (
+                                        <div className="relative rounded-3xl overflow-hidden shadow-2xl group/vid bg-black/40 backdrop-blur-sm">
+                                            <video 
+                                                src={m.url} 
+                                                controls 
+                                                loop 
+                                                muted 
+                                                playsInline 
+                                                autoPlay
+                                                className="w-full h-auto max-h-[70vh] object-contain mx-auto"
+                                            />
+                                            <div className="absolute top-4 right-4 bg-primary/20 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-black text-primary uppercase tracking-[0.2em] opacity-0 group-hover/vid:opacity-100 transition-all duration-300 border border-primary/30">
+                                                Reel
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
                                             <div className="flex items-center gap-3">

@@ -278,9 +278,20 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
                                     <div className="flex flex-col gap-2 mb-2">
                                         {msg.media.map((m, i) => (
                                             m.type?.startsWith('image/') ? (
-                                                <img key={i} src={m.url} alt="chat-media" className="max-w-[200px] rounded-xl border border-outline-variant/20 shadow-md" />
+                                                <img key={i} src={m.url} alt="chat-media" className="max-w-[240px] rounded-2xl border border-outline-variant/20 shadow-lg" />
+                                            ) : m.type?.startsWith('video/') ? (
+                                                <video 
+                                                    key={i} 
+                                                    src={m.url} 
+                                                    controls 
+                                                    loop 
+                                                    muted 
+                                                    playsInline 
+                                                    autoPlay
+                                                    className="max-w-[240px] rounded-2xl border border-outline-variant/20 shadow-lg bg-black" 
+                                                />
                                             ) : (
-                                                <div key={i} className="flex items-center gap-2 bg-surface-variant/50 px-3 py-2 rounded-lg border border-outline-variant/10 text-xs">
+                                                <div key={i} className="flex items-center gap-2 bg-surface-variant/50 px-3 py-2 rounded-lg border border-outline-variant/10 text-xs text-on-surface">
                                                     <span className="material-symbols-outlined text-sm">description</span> {m.name}
                                                 </div>
                                             )
@@ -305,9 +316,16 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
                                     {media.map((m, idx) => (
                                         <div key={idx} className="relative group">
                                             {m.type?.startsWith('image/') ? (
-                                                <img src={m.url} className="h-12 w-12 object-cover rounded-lg border border-outline-variant/30" />
+                                                <img src={m.url} className="h-12 w-12 object-cover rounded-lg border border-outline-variant/30 shadow-sm" />
+                                            ) : m.type?.startsWith('video/') ? (
+                                                <div className="h-12 w-12 rounded-lg border border-outline-variant/30 overflow-hidden bg-black shadow-sm relative">
+                                                    <video src={m.url} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                                        <span className="material-symbols-outlined text-[12px] text-white">play_arrow</span>
+                                                    </div>
+                                                </div>
                                             ) : (
-                                                <div className="h-12 w-12 flex items-center justify-center bg-surface-variant rounded-lg border border-outline-variant/30">
+                                                <div className="h-12 w-12 flex items-center justify-center bg-surface-variant rounded-lg border border-outline-variant/30 shadow-sm">
                                                     <span className="material-symbols-outlined text-sm">description</span>
                                                 </div>
                                             )}
