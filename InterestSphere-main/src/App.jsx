@@ -453,50 +453,9 @@ function App() {
 
           {currentView === 'feed' && (
             <>
-              <section className="mb-12 flex justify-between items-end">
-                <div>
-                  <h1 className="text-5xl font-headline font-extrabold tracking-tighter text-on-surface mb-2">InterestSphere feed</h1>
-                  <p className="text-on-surface-variant/70 text-lg">Your gateway to the local cluster of interests.</p>
-                </div>
-                <button 
-                  onClick={async () => {
-                    const postsToSeed = [
-                      { author: 'Dr. Turing', domain: 'AI', body: 'The integration of multimodal LLMs into robotics is reaching a tipping point. We are seeing unprecedented zero-shot performance in spatial reasoning.', likes: 142 },
-                      { author: 'Neural_Explorer', domain: 'AI', body: 'Just finished a benchmark on the latest reasoning-optimized models. The logical consistency in complex mathematical proofs is staggering.', likes: 89 },
-                      { author: 'AI_Ethics', domain: 'AI', body: 'As we move towards AGI, the focus must shift from pure capability to robust alignment and safety frameworks.', likes: 210 },
-                      { author: 'React_Master', domain: 'Web Dev', body: 'React 19’s "Actions" and "use" hook are fundamentally changing how we handle server-side state. The DX is getting incredibly smooth.', likes: 76 },
-                      { author: 'Vite_Fast', domain: 'Web Dev', body: 'If you aren’t using HMR with Vite yet, you’re missing out on 50% of your potential productivity. Instant feedback is a game changer.', likes: 54 },
-                      { author: 'Tailwind_Fan', domain: 'Web Dev', body: 'Glassmorphism + Tailwind’s arbitrary values = Pure Magic. InterestSphere’s UI is a great example of this aesthetic.', likes: 112 },
-                      { author: 'Market_Watch', domain: 'Finance', body: 'The Q1 interest rate projections are in. It looks like we’re in for a period of stabilization before any significant cuts.', likes: 65 },
-                      { author: 'Crypto_Insight', domain: 'Finance', body: 'Decentralized Finance (DeFi) is moving towards "Institutional Grade" infrastructure. Expect major players to enter the sphere this year.', likes: 128 },
-                      { author: 'Mars_Pioneer', domain: 'Space', body: 'The latest telemetry from the Jovian moons suggests a subsurface ocean with high chemical potential. Life might be closer than we think.', likes: 320 },
-                      { author: 'Orbital_Tech', domain: 'Space', body: 'Reusable launch systems have dropped the cost-to-orbit by nearly 90%. We are entering a new era of space industrialization.', likes: 198 },
-                      { author: 'Stellar_Observer', domain: 'Space', body: 'The James Webb Telescope just captured a high-res spectrum of an exoplanet atmosphere. Methane and Water vapor detected!', likes: 542 },
-                      { author: 'Gamer_X', domain: 'Gaming', body: 'The world design in "Elders Reach" is a masterclass in environmental storytelling. Every ruin tells a story without a single dialogue.', likes: 87 },
-                      { author: 'Retro_Vibe', domain: 'Gaming', body: 'Indie devs are pushing the boundaries of pixel art. "Neon Drift" is proof that style and gameplay matter more than polygon counts.', likes: 43 }
-                    ];
-                    
-                    try {
-                      for (const p of postsToSeed) {
-                        await addDoc(collection(db, 'posts'), {
-                          ...p,
-                          authorId: user.uid,
-                          createdAt: serverTimestamp(),
-                          likedBy: [],
-                          commentsList: []
-                        });
-                      }
-                      alert("Database Seeded! 13 expert posts have been added to your backend.");
-                    } catch (err) {
-                      console.error(err);
-                      alert("Seeding failed. Are you logged in?");
-                    }
-                  }}
-                  className="px-4 py-2 bg-primary/10 border border-primary/30 rounded-xl text-primary text-xs font-bold hover:bg-primary/20 transition-all flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-sm">database</span>
-                  Seed Content
-                </button>
+              <section className="mb-12">
+                <h1 className="text-5xl font-headline font-extrabold tracking-tighter text-on-surface mb-2">InterestSphere feed</h1>
+                <p className="text-on-surface-variant/70 text-lg">Your gateway to the local cluster of interests.</p>
               </section>
               
               <PostCreator
