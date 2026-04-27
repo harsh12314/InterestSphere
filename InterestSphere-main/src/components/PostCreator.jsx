@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const PostCreator = ({ availableDomains, onPost }) => {
     const [content, setContent] = useState('');
@@ -25,18 +25,37 @@ const PostCreator = ({ availableDomains, onPost }) => {
     };
 
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const handlePost = async () => {
         if (!selectedDomain || content.trim().length === 0) return;
         setIsUploading(true);
+        setUploadProgress(0);
 
         try {
             const uploadedMedia = await Promise.all(media.map(async (m) => {
                 if (m.file) {
-                    const storageRef = ref(storage, `posts/${Date.now()}_${m.name}`);
-                    const snapshot = await uploadBytes(storageRef, m.file);
-                    const url = await getDownloadURL(snapshot.ref);
-                    return { url, name: m.name, type: m.type };
+                    // Sanitize filename: remove spaces and special chars
+                    const safeName = m.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+                    const storageRef = ref(storage, `posts/${Date.now()}_${safeName}`);
+                    
+                    return new Promise((resolve, reject) => {
+                        const uploadTask = uploadBytesResumable(storageRef, m.file);
+                        uploadTask.on('state_changed', 
+                            (snapshot) => {
+                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                                setUploadProgress(progress);
+                            }, 
+                            (error) => {
+                                console.error("Upload error for file:", m.name, error);
+                                reject(error);
+                            }, 
+                            async () => {
+                                const url = await getDownloadURL(uploadTask.snapshot.ref);
+                                resolve({ url, name: m.name, type: m.type });
+                            }
+                        );
+                    });
                 }
                 return { url: m.url || '#', name: m.name, type: m.type };
             }));
@@ -55,10 +74,11 @@ const PostCreator = ({ availableDomains, onPost }) => {
             setSelectedDomain('');
             setMedia([]);
         } catch (error) {
-            console.error("Upload error:", error);
-            alert("Failed to upload media. Please try again.");
+            console.error("Critical Upload error:", error);
+            alert(`Upload failed: ${error.message || 'Check your Firebase Storage rules'}`);
         } finally {
             setIsUploading(false);
+            setUploadProgress(0);
         }
     };
 
@@ -132,12 +152,18 @@ const PostCreator = ({ availableDomains, onPost }) => {
                             </select>
                         </div>
                         <button 
-                            className={`px-8 py-2 rounded-full font-bold text-sm transition-all flex items-center gap-2 ${(!selectedDomain || content.trim().length === 0 || isUploading) ? 'bg-surface-variant text-outline-variant cursor-not-allowed' : 'bg-primary text-on-primary hover:shadow-[0_0_15px_rgba(208,149,255,0.4)]'}`}
+                            className={`px-8 py-2 rounded-full font-bold text-sm transition-all flex items-center gap-2 relative overflow-hidden ${(!selectedDomain || content.trim().length === 0 || isUploading) ? 'bg-surface-variant text-outline-variant cursor-not-allowed' : 'bg-primary text-on-primary hover:shadow-[0_0_15px_rgba(208,149,255,0.4)]'}`}
                             disabled={!selectedDomain || content.trim().length === 0 || isUploading}
                             onClick={handlePost}
                         >
+                            {isUploading && (
+                                <div 
+                                    className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300" 
+                                    style={{ width: `${uploadProgress}%` }}
+                                ></div>
+                            )}
                             {isUploading && <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>}
-                            {isUploading ? 'Transmitting...' : 'Launch'}
+                            {isUploading ? `Transmitting (${Math.round(uploadProgress)}%)...` : 'Launch'}
                         </button>
                     </div>
                 </div>

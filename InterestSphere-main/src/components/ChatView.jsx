@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
     collection,
     query,
@@ -24,6 +24,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     const fileInputRef = useRef(null);
     const [media, setMedia] = useState([]);
     const [isSending, setIsSending] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
     const [showChatOnMobile, setShowChatOnMobile] = useState(false);
@@ -160,6 +161,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     const handleSendMessage = async () => {
         if ((!inputText.trim() && media.length === 0) || !selectedUser || !user || isSending) return;
         setIsSending(true);
+        setUploadProgress(0);
 
         const convId = getConvId(user.uid, selectedUser.id);
         const messagesRef = collection(db, 'conversations', convId, 'messages');
@@ -168,10 +170,26 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
         try {
             const uploadedMedia = await Promise.all(media.map(async (m) => {
                 if (m.file) {
-                    const storageRef = ref(storage, `chats/${Date.now()}_${m.name}`);
-                    const snapshot = await uploadBytes(storageRef, m.file);
-                    const url = await getDownloadURL(snapshot.ref);
-                    return { url, name: m.name, type: m.type };
+                    const safeName = m.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+                    const storageRef = ref(storage, `chats/${Date.now()}_${safeName}`);
+                    
+                    return new Promise((resolve, reject) => {
+                        const uploadTask = uploadBytesResumable(storageRef, m.file);
+                        uploadTask.on('state_changed', 
+                            (snapshot) => {
+                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                                setUploadProgress(progress);
+                            }, 
+                            (error) => {
+                                console.error("Chat upload error:", m.name, error);
+                                reject(error);
+                            }, 
+                            async () => {
+                                const url = await getDownloadURL(uploadTask.snapshot.ref);
+                                resolve({ url, name: m.name, type: m.type });
+                            }
+                        );
+                    });
                 }
                 return m;
             }));
@@ -191,9 +209,10 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
             await addDoc(messagesRef, messageData);
         } catch (error) {
             console.error("Error sending message:", error);
-            alert("Failed to send message. Please try again.");
+            alert(`Send failed: ${error.message || 'Check your connection'}`);
         } finally {
             setIsSending(false);
+            setUploadProgress(0);
         }
     };
 
