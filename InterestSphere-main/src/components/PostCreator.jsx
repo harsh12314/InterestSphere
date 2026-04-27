@@ -40,7 +40,8 @@ const PostCreator = ({ availableDomains, onPost }) => {
                     const storageRef = ref(storage, `posts/${Date.now()}_${safeName}`);
                     
                     return new Promise((resolve, reject) => {
-                        const uploadTask = uploadBytesResumable(storageRef, m.file);
+                        const metadata = { contentType: m.file.type };
+                        const uploadTask = uploadBytesResumable(storageRef, m.file, metadata);
                         uploadTask.on('state_changed', 
                             (snapshot) => {
                                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
