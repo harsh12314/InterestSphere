@@ -393,15 +393,6 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4 text-slate-400">
-            <a 
-              href="/InterestSphere_Project_Report.docx" 
-              download 
-              className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full text-xs font-bold text-primary hover:bg-primary/20 transition-all mr-2"
-              title="Download Project Documentation"
-            >
-              <span className="material-symbols-outlined text-[16px]">description</span>
-              Report
-            </a>
             <span className="material-symbols-outlined hover:text-[#d095ff] cursor-pointer transition-colors">notifications</span>
             <span className="material-symbols-outlined hover:text-[#d095ff] cursor-pointer transition-colors" onClick={toggleTheme}>settings</span>
             {user && (
