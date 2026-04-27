@@ -75,7 +75,15 @@ const PostCreator = ({ availableDomains, onPost }) => {
             setMedia([]);
         } catch (error) {
             console.error("Critical Upload error:", error);
-            alert(`Upload failed: ${error.message || 'Check your Firebase Storage rules'}`);
+            let msg = "Upload failed. ";
+            if (error.code === 'storage/unauthorized') {
+                msg += "Please update your Firebase Storage Rules (see my instructions).";
+            } else if (error.code === 'storage/retry-limit-exceeded') {
+                msg += "Connection timed out. Check your internet.";
+            } else {
+                msg += error.message || "Unknown error.";
+            }
+            alert(msg);
         } finally {
             setIsUploading(false);
             setUploadProgress(0);

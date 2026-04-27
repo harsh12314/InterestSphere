@@ -209,7 +209,13 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
             await addDoc(messagesRef, messageData);
         } catch (error) {
             console.error("Error sending message:", error);
-            alert(`Send failed: ${error.message || 'Check your connection'}`);
+            let msg = "Send failed. ";
+            if (error.code === 'storage/unauthorized') {
+                msg += "Update your Firebase Storage Rules to allow uploads.";
+            } else {
+                msg += error.message || "Check your connection.";
+            }
+            alert(msg);
         } finally {
             setIsSending(false);
             setUploadProgress(0);
