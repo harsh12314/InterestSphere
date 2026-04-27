@@ -388,16 +388,51 @@ const UserProfile = ({ user, currentUserData, subscribedSpheres, activatedSphere
                 </div>
                 <div>
                     <h4 className="text-xs font-bold uppercase tracking-widest text-outline-variant mb-6">Current Feed Actuators</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         {subscribedSpheres?.map(sphere => {
                             const isActive = activatedSpheres?.some(s => s.name === sphere.name);
                             return (
-                                <div key={sphere.name} className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${isActive ? 'bg-surface-variant border-primary/50 shadow-md' : 'bg-surface border-outline-variant/10 opacity-70 hover:opacity-100'}`} onClick={() => onToggleActivation?.(sphere)}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sphere.color || '#334155' }}></div>
-                                        <span className="font-bold text-on-surface">#{sphere.name.toUpperCase()}</span>
+                                <div 
+                                    key={sphere.name} 
+                                    className={`relative group p-5 rounded-[1.5rem] border transition-all duration-500 cursor-pointer flex items-center justify-between overflow-hidden ${isActive 
+                                        ? 'bg-surface-variant/40 border-primary/40 backdrop-blur-md' 
+                                        : 'bg-surface/30 border-outline-variant/10 opacity-60 hover:opacity-100 hover:bg-surface/50'}`} 
+                                    style={{ 
+                                        boxShadow: isActive ? `0 0 20px ${sphere.color}15` : 'none',
+                                        borderColor: isActive ? `${sphere.color}60` : 'rgba(255,255,255,0.1)'
+                                    }}
+                                    onClick={() => onToggleActivation?.(sphere)}
+                                >
+                                    {/* Background glow for active states */}
+                                    {isActive && (
+                                        <div 
+                                            className="absolute top-0 right-0 w-24 h-24 blur-[40px] opacity-20 -translate-y-1/2 translate-x-1/2 rounded-full transition-all duration-700"
+                                            style={{ backgroundColor: sphere.color }}
+                                        ></div>
+                                    )}
+
+                                    <div className="flex items-center gap-4 relative z-10">
+                                        <div 
+                                            className={`w-3.5 h-3.5 rounded-full transition-all duration-500 ${isActive ? 'animate-pulse scale-110' : ''}`} 
+                                            style={{ 
+                                                backgroundColor: sphere.color || '#334155',
+                                                boxShadow: isActive ? `0 0 12px ${sphere.color}` : 'none'
+                                            }}
+                                        ></div>
+                                        <span className={`font-headline font-black tracking-tight transition-colors duration-300 ${isActive ? 'text-on-surface' : 'text-outline-variant'}`}>
+                                            #{sphere.name.toUpperCase()}
+                                        </span>
                                     </div>
-                                    <div className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded border ${isActive ? 'text-primary border-primary/30 bg-primary/10' : 'text-outline-variant border-outline-variant/20'}`}>{isActive ? 'Transmitting' : 'Dormant'}</div>
+
+                                    <div className="relative z-10 flex items-center">
+                                        <div className={`text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-lg border transition-all duration-500 ${
+                                            isActive 
+                                                ? 'text-primary border-primary/40 bg-primary/10 animate-[pulse_2s_infinite]' 
+                                                : 'text-outline-variant border-outline-variant/20 bg-surface/20'
+                                        }`}>
+                                            {isActive ? 'Transmitting' : 'Dormant'}
+                                        </div>
+                                    </div>
                                 </div>
                             );
                         })}
