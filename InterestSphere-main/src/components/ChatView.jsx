@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../firebase';
+import { db, storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
     collection,
     query,
@@ -22,6 +23,7 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const [media, setMedia] = useState([]);
+    const [isSending, setIsSending] = useState(false);
 
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
     const [showChatOnMobile, setShowChatOnMobile] = useState(false);
@@ -146,8 +148,8 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
 
     const handleFileChange = (e) => {
         const files = Array.from(e.target.files);
-        // In a real app, we would upload these to Firebase Storage and get URLs
         const newMedia = files.map(file => ({
+            file,
             url: URL.createObjectURL(file),
             type: file.type,
             name: file.name
@@ -156,28 +158,42 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
     };
 
     const handleSendMessage = async () => {
-        if ((!inputText.trim() && media.length === 0) || !selectedUser || !user) return;
+        if ((!inputText.trim() && media.length === 0) || !selectedUser || !user || isSending) return;
+        setIsSending(true);
 
         const convId = getConvId(user.uid, selectedUser.id);
         const messagesRef = collection(db, 'conversations', convId, 'messages');
         const convRef = doc(db, 'conversations', convId);
 
-        const messageData = {
-            text: inputText,
-            senderId: user.uid,
-            senderName: user.displayName || user.email,
-            timestamp: serverTimestamp(),
-            media: media
-        };
-
-        setInputText('');
-        setMedia([]);
-
         try {
+            const uploadedMedia = await Promise.all(media.map(async (m) => {
+                if (m.file) {
+                    const storageRef = ref(storage, `chats/${Date.now()}_${m.name}`);
+                    const snapshot = await uploadBytes(storageRef, m.file);
+                    const url = await getDownloadURL(snapshot.ref);
+                    return { url, name: m.name, type: m.type };
+                }
+                return m;
+            }));
+
+            const messageData = {
+                text: inputText,
+                senderId: user.uid,
+                senderName: user.displayName || user.email,
+                timestamp: serverTimestamp(),
+                media: uploadedMedia
+            };
+
+            setInputText('');
+            setMedia([]);
+
             await setDoc(convRef, { participants: [user.uid, selectedUser.id], lastUpdated: serverTimestamp() }, { merge: true });
             await addDoc(messagesRef, messageData);
         } catch (error) {
             console.error("Error sending message:", error);
+            alert("Failed to send message. Please try again.");
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -354,11 +370,15 @@ const ChatView = ({ user, spheres, currentUserData, directChatUser }) => {
                                     />
                                 </div>
                                 <button
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${(!inputText.trim() && media.length === 0) ? 'bg-surface-variant text-outline-variant/50 cursor-not-allowed' : 'bg-primary text-on-primary shadow-[0_0_15px_rgba(208,149,255,0.4)] hover:scale-105 active:scale-95'}`}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${((!inputText.trim() && media.length === 0) || isSending) ? 'bg-surface-variant text-outline-variant/50 cursor-not-allowed' : 'bg-primary text-on-primary shadow-[0_0_15px_rgba(208,149,255,0.4)] hover:scale-105 active:scale-95'}`}
                                     onClick={handleSendMessage}
-                                    disabled={!inputText.trim() && media.length === 0}
+                                    disabled={(!inputText.trim() && media.length === 0) || isSending}
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">send</span>
+                                    {isSending ? (
+                                        <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <span className="material-symbols-outlined text-[18px]">send</span>
+                                    )}
                                 </button>
                             </div>
                         </div>

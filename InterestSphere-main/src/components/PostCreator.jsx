@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import { storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const PostCreator = ({ availableDomains, onPost }) => {
     const [content, setContent] = useState('');
@@ -22,26 +24,42 @@ const PostCreator = ({ availableDomains, onPost }) => {
         setMedia(media.filter(m => m.id !== id));
     };
 
-    const handlePost = () => {
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handlePost = async () => {
         if (!selectedDomain || content.trim().length === 0) return;
+        setIsUploading(true);
 
-        onPost({
-            author: 'You',
-            domain: selectedDomain,
-            body: content,
-            time: 'Just now',
-            likes: 0,
-            commentsList: [],
-            media: media.map(m => ({
-                url: m.preview || '#', // in real app, these are uploaded URLs
-                name: m.name,
-                type: m.type
-            }))
-        });
+        try {
+            const uploadedMedia = await Promise.all(media.map(async (m) => {
+                if (m.file) {
+                    const storageRef = ref(storage, `posts/${Date.now()}_${m.name}`);
+                    const snapshot = await uploadBytes(storageRef, m.file);
+                    const url = await getDownloadURL(snapshot.ref);
+                    return { url, name: m.name, type: m.type };
+                }
+                return { url: m.url || '#', name: m.name, type: m.type };
+            }));
 
-        setContent('');
-        setSelectedDomain('');
-        setMedia([]);
+            onPost({
+                author: 'You',
+                domain: selectedDomain,
+                body: content,
+                time: 'Just now',
+                likes: 0,
+                commentsList: [],
+                media: uploadedMedia
+            });
+
+            setContent('');
+            setSelectedDomain('');
+            setMedia([]);
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Failed to upload media. Please try again.");
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     return (
@@ -114,11 +132,12 @@ const PostCreator = ({ availableDomains, onPost }) => {
                             </select>
                         </div>
                         <button 
-                            className={`px-8 py-2 rounded-full font-bold text-sm transition-all ${(!selectedDomain || content.trim().length === 0) ? 'bg-surface-variant text-outline-variant cursor-not-allowed' : 'bg-primary text-on-primary hover:shadow-[0_0_15px_rgba(208,149,255,0.4)]'}`}
-                            disabled={!selectedDomain || content.trim().length === 0}
+                            className={`px-8 py-2 rounded-full font-bold text-sm transition-all flex items-center gap-2 ${(!selectedDomain || content.trim().length === 0 || isUploading) ? 'bg-surface-variant text-outline-variant cursor-not-allowed' : 'bg-primary text-on-primary hover:shadow-[0_0_15px_rgba(208,149,255,0.4)]'}`}
+                            disabled={!selectedDomain || content.trim().length === 0 || isUploading}
                             onClick={handlePost}
                         >
-                            Launch
+                            {isUploading && <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>}
+                            {isUploading ? 'Transmitting...' : 'Launch'}
                         </button>
                     </div>
                 </div>
