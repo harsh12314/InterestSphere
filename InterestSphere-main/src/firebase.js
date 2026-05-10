@@ -5,15 +5,6 @@ import { getAnalytics } from "firebase/analytics";
 import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
-const firebaseConfig = {
-    apiKey: "yourAPIkey here",
-    authDomain: "interestsphere-6e899.firebaseapp.com",
-    projectId: "interestsphere-6e899",
-    storageBucket: "interestsphere-6e899.firebasestorage.app",
-    messagingSenderId: "946870584799",
-    appId: "1:946870584799:web:f26e1aca671ebd6f7ff06a",
-    measurementId: "G-TX45BW39BJ"
-};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
