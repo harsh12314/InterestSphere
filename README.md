@@ -1,4 +1,4 @@
-A real-time social discovery web application that connects people through shared passions, hobbies, and academic interests.
+A Real-time social discovery web application that connects people through shared passions, hobbies, and academic interests.
 ---
 ## 🚀 Live Demo
 Check out the live application hosted on Firebase:  
